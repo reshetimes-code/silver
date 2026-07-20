@@ -1,65 +1,136 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { motion, AnimatePresence } from 'framer-motion';
+import { useStore } from '@/lib/store';
+import { t } from '@/lib/i18n';
+import { useHydrated } from '@/lib/use-hydrated';
+import Logo from '@/components/ui/Logo';
+import LanguageToggle from '@/components/ui/LanguageToggle';
+import ParticleBackground from '@/components/ui/ParticleBackground';
+import Link from 'next/link';
+
+export default function LandingPage() {
+  const hydrated = useHydrated();
+  const { locale, events } = useStore();
+  const activeEvents = events.filter((e) => e.active);
+
+  if (!hydrated) return null;
+
+  const isRtl = locale === 'he';
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div className="min-h-dvh relative flex flex-col" dir={isRtl ? 'rtl' : 'ltr'}>
+      <ParticleBackground />
+      <LanguageToggle />
+
+      {/* Main content - centered */}
+      <main className="flex-1 flex flex-col items-center justify-center px-5 py-8 relative z-10">
+
+        {/* Logo */}
+        <motion.div
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', damping: 14, delay: 0.1 }}
+          className="mb-5"
+        >
+          <Logo size="lg" />
+        </motion.div>
+
+        {/* Tagline */}
+        <motion.p
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="text-base sm:text-xl text-white/60 text-center mb-8 max-w-xs sm:max-w-md"
+        >
+          {t(locale, 'scanQR')}
+        </motion.p>
+
+        {/* Animated QR */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.5 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.6, type: 'spring' }}
+          className="relative mb-10"
+        >
+          <div className="w-32 h-32 sm:w-40 sm:h-40 glass-card flex items-center justify-center float-animation relative pulse-ring rounded-2xl">
+            <svg viewBox="0 0 100 100" className="w-20 h-20 sm:w-24 sm:h-24" fill="none">
+              <rect x="10" y="10" width="25" height="25" rx="3" fill="#e94560" />
+              <rect x="65" y="10" width="25" height="25" rx="3" fill="#e94560" />
+              <rect x="10" y="65" width="25" height="25" rx="3" fill="#e94560" />
+              <rect x="15" y="15" width="15" height="15" rx="2" fill="#0a0a1a" />
+              <rect x="70" y="15" width="15" height="15" rx="2" fill="#0a0a1a" />
+              <rect x="15" y="70" width="15" height="15" rx="2" fill="#0a0a1a" />
+              <rect x="19" y="19" width="7" height="7" rx="1" fill="#e94560" />
+              <rect x="74" y="19" width="7" height="7" rx="1" fill="#e94560" />
+              <rect x="19" y="74" width="7" height="7" rx="1" fill="#e94560" />
+              <rect x="40" y="10" width="5" height="5" fill="#0f3460" />
+              <rect x="50" y="10" width="5" height="5" fill="#0f3460" />
+              <rect x="40" y="40" width="5" height="5" fill="#0f3460" />
+              <rect x="55" y="40" width="5" height="5" fill="#0f3460" />
+              <rect x="65" y="45" width="5" height="5" fill="#0f3460" />
+              <rect x="50" y="65" width="5" height="5" fill="#0f3460" />
+              <rect x="75" y="75" width="5" height="5" fill="#0f3460" />
+              <rect x="65" y="85" width="5" height="5" fill="#0f3460" />
+            </svg>
+          </div>
+        </motion.div>
+
+        {/* Active Events */}
+        {activeEvents.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8 }}
+            className="w-full max-w-sm space-y-3"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+            <h3 className="text-center text-white/40 text-xs uppercase tracking-[0.2em] mb-3">
+              {t(locale, 'events')}
+            </h3>
+            <AnimatePresence>
+              {activeEvents.map((event, i) => (
+                <motion.div
+                  key={event.id}
+                  initial={{ opacity: 0, x: isRtl ? 24 : -24 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.9 + i * 0.08 }}
+                >
+                  <Link href={`/event/${event.id}`}>
+                    <div className="glass-card p-4 flex items-center justify-between active:scale-[0.98] transition-transform group">
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-base font-bold text-white truncate group-active:text-primary transition-colors">
+                          {event.name}
+                        </h4>
+                        <p className="text-xs text-white/40 mt-0.5">{event.date}</p>
+                      </div>
+                      <div className="flex-shrink-0 ml-3 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <span className="text-lg">📸</span>
+                      </div>
+                    </div>
+                  </Link>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </motion.div>
+        )}
+
+        {/* Admin Link */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.2 }}
+          className="mt-10"
+        >
+          <Link href="/admin">
+            <button className="btn-secondary text-sm">
+              {t(locale, 'admin')}
+            </button>
+          </Link>
+        </motion.div>
       </main>
+
+      {/* Bottom accent line */}
+      <div className="h-0.5 bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
     </div>
   );
 }
