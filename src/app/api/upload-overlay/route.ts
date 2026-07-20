@@ -1,32 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
-
-const OVERLAYS_FOLDER = path.join(process.cwd(), 'public', 'overlays');
+import { prisma } from '@/lib/db';
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('overlay') as File;
-    const eventId = formData.get('eventId') as string;
+    const name = (formData.get('name') as string) || file?.name?.replace(/\.[^.]+$/, '') || 'Overlay';
 
-    if (!file || !eventId) {
-      return NextResponse.json({ error: 'Missing file or eventId' }, { status: 400 });
+    if (!file) {
+      return NextResponse.json({ error: 'Missing file' }, { status: 400 });
     }
 
-    await mkdir(OVERLAYS_FOLDER, { recursive: true });
-
+    // Convert to base64 data URL for storage
     const buffer = Buffer.from(await file.arrayBuffer());
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
-    const filename = `${eventId}.${ext}`;
-    const filepath = path.join(OVERLAYS_FOLDER, filename);
+    const base64 = buffer.toString('base64');
+    const mimeType = file.type || 'image/png';
+    const dataUrl = `data:${mimeType};base64,${base64}`;
 
-    await writeFile(filepath, buffer);
-
-    return NextResponse.json({
-      success: true,
-      url: `/overlays/${filename}`,
+    const overlay = await prisma.overlay.create({
+      data: { name, url: dataUrl },
     });
+
+    return NextResponse.json({ success: true, overlay });
   } catch (error) {
     console.error('Overlay upload error:', error);
     return NextResponse.json({ error: 'Failed to upload overlay' }, { status: 500 });
