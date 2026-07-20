@@ -5,62 +5,52 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '@/lib/store';
 import { t } from '@/lib/i18n';
 import { useHydrated } from '@/lib/use-hydrated';
+import { api } from '@/lib/api';
 import LanguageToggle from '@/components/ui/LanguageToggle';
 import Logo from '@/components/ui/Logo';
 import ParticleBackground from '@/components/ui/ParticleBackground';
-import { v4 as uuidv4 } from 'uuid';
 import Link from 'next/link';
 
 type Tab = 'events' | 'overlays' | 'photos';
 
+interface EventData { id: string; name: string; date: string; maxPrintsPerDevice: number; active: boolean; }
+interface OverlayData { id: string; name: string; url: string; }
+interface PhotoData { id: string; eventId: string; photoUrl: string; overlayId: string | null; deviceId: string; createdAt: string; event?: EventData; overlay?: OverlayData; }
+
 export default function AdminPage() {
   const hydrated = useHydrated();
-  const store = useStore();
-  const { locale } = store;
+  const { locale } = useStore();
   const [tab, setTab] = useState<Tab>('events');
   const isRtl = locale === 'he';
+  const he = locale === 'he';
 
   if (!hydrated) return null;
-
-  const he = locale === 'he';
 
   return (
     <div className="min-h-dvh relative" dir={isRtl ? 'rtl' : 'ltr'}>
       <ParticleBackground />
       <LanguageToggle />
-
-      {/* Header */}
       <div className="app-header flex items-center justify-between">
         <Link href="/"><Logo size="sm" /></Link>
         <h1 className="text-sm font-bold text-white/80">{t(locale, 'admin')}</h1>
       </div>
-
-      {/* Tabs */}
       <div className="sticky top-[53px] z-30 bg-[#0a0a1a]/90 backdrop-blur-lg border-b border-white/5">
         <div className="flex max-w-3xl mx-auto">
           {([
             { id: 'events' as Tab, label: he ? 'אירועים' : 'Events', icon: '🎉' },
             { id: 'overlays' as Tab, label: he ? 'מסגרות' : 'Overlays', icon: '🖼️' },
             { id: 'photos' as Tab, label: he ? 'תמונות' : 'Photos', icon: '📸' },
-          ]).map((t) => (
-            <button
-              key={t.id}
-              className={`flex-1 py-3 text-center text-xs font-bold transition-all relative ${
-                tab === t.id ? 'text-primary' : 'text-white/40'
-              }`}
-              onClick={() => setTab(t.id)}
-            >
-              <span className="text-base block mb-0.5">{t.icon}</span>
-              {t.label}
-              {tab === t.id && (
-                <motion.div layoutId="tab-indicator" className="absolute bottom-0 left-2 right-2 h-0.5 bg-primary rounded-full" />
-              )}
+          ]).map((tb) => (
+            <button key={tb.id}
+              className={`flex-1 py-3 text-center text-xs font-bold transition-all relative ${tab === tb.id ? 'text-primary' : 'text-white/40'}`}
+              onClick={() => setTab(tb.id)}>
+              <span className="text-base block mb-0.5">{tb.icon}</span>
+              {tb.label}
+              {tab === tb.id && <motion.div layoutId="tab-indicator" className="absolute bottom-0 left-2 right-2 h-0.5 bg-primary rounded-full" />}
             </button>
           ))}
         </div>
       </div>
-
-      {/* Tab content */}
       <div className="relative z-10 px-4 pb-24 pt-4 max-w-3xl mx-auto">
         <AnimatePresence mode="wait">
           {tab === 'events' && <EventsTab key="events" />}
@@ -74,7 +64,9 @@ export default function AdminPage() {
 
 // ===================== EVENTS TAB =====================
 function EventsTab() {
-  const { locale, events, addEvent, updateEvent, deleteEvent, printJobs } = useStore();
+  const { locale } = useStore();
+  const he = locale === 'he';
+  const [events, setEvents] = useState<EventData[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showQR, setShowQR] = useState<string | null>(null);
@@ -82,26 +74,30 @@ function EventsTab() {
   const [date, setDate] = useState('');
   const [maxPrints, setMaxPrints] = useState(5);
   const [errors, setErrors] = useState<{ name?: boolean; date?: boolean }>({});
-  const he = locale === 'he';
+  const [loading, setLoading] = useState(true);
+
+  const loadEvents = () => {
+    api.getEvents().then((data) => { setEvents(data); setLoading(false); });
+  };
+
+  useEffect(() => { loadEvents(); }, []);
 
   const resetForm = () => {
     setName(''); setDate(''); setMaxPrints(5); setShowForm(false); setEditingId(null); setErrors({});
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const errs = { name: !name.trim(), date: !date };
     setErrors(errs);
     if (errs.name || errs.date) return;
 
     if (editingId) {
-      updateEvent(editingId, { name, date, maxPrintsPerDevice: maxPrints });
+      await api.updateEvent(editingId, { name, date, maxPrintsPerDevice: maxPrints });
     } else {
-      addEvent({
-        id: uuidv4(), name, date, maxPrintsPerDevice: maxPrints,
-        active: true, createdAt: new Date().toISOString(),
-      });
+      await api.createEvent({ name, date, maxPrintsPerDevice: maxPrints });
     }
     resetForm();
+    loadEvents();
   };
 
   const startEdit = (id: string) => {
@@ -111,13 +107,25 @@ function EventsTab() {
     setEditingId(id); setShowForm(true);
   };
 
+  const handleDelete = async (id: string) => {
+    if (!confirm(he ? 'למחוק?' : 'Delete?')) return;
+    await api.deleteEvent(id);
+    loadEvents();
+  };
+
+  const handleToggle = async (id: string, active: boolean) => {
+    await api.updateEvent(id, { active: !active });
+    loadEvents();
+  };
+
+  if (loading) return <div className="text-center py-10"><span className="text-3xl">⏳</span></div>;
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <button className="btn-glow w-full mb-5" onClick={() => { resetForm(); setShowForm(true); }}>
         + {he ? 'אירוע חדש' : 'New Event'}
       </button>
 
-      {/* Form */}
       <AnimatePresence>
         {showForm && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
@@ -151,7 +159,6 @@ function EventsTab() {
         )}
       </AnimatePresence>
 
-      {/* Events list */}
       <div className="space-y-3">
         {events.map((event, i) => (
           <motion.div key={event.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
@@ -167,10 +174,7 @@ function EventsTab() {
                   {event.active ? (he ? 'פעיל' : 'Active') : (he ? 'כבוי' : 'Off')}
                 </span>
               </div>
-              <div className="text-xs text-white/40 mb-3">
-                📸 {printJobs.filter((j) => j.eventId === event.id).length} {he ? 'תמונות' : 'photos'} · 📱 Max: {event.maxPrintsPerDevice}
-              </div>
-              <div className="flex gap-2 overflow-x-auto pb-1">
+              <div className="flex gap-2 overflow-x-auto pb-1 mt-3">
                 <button className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold bg-primary/15 text-primary active:bg-primary/25"
                   onClick={() => setShowQR(showQR === event.id ? null : event.id)}>QR</button>
                 <Link href={`/admin/event/${event.id}/qr`} className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold bg-purple-500/15 text-purple-400 active:bg-purple-500/25">
@@ -179,12 +183,10 @@ function EventsTab() {
                 <button className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold bg-blue-500/15 text-blue-400 active:bg-blue-500/25"
                   onClick={() => startEdit(event.id)}>{he ? 'ערוך' : 'Edit'}</button>
                 <button className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold bg-white/8 text-white/60 active:bg-white/15"
-                  onClick={() => updateEvent(event.id, { active: !event.active })}>{event.active ? '⏸' : '▶️'}</button>
+                  onClick={() => handleToggle(event.id, event.active)}>{event.active ? '⏸' : '▶️'}</button>
                 <button className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold bg-red-500/15 text-red-400 active:bg-red-500/25"
-                  onClick={() => { if (confirm('Delete?')) deleteEvent(event.id); }}>🗑️</button>
+                  onClick={() => handleDelete(event.id)}>🗑️</button>
               </div>
-
-              {/* Inline QR */}
               <AnimatePresence>
                 {showQR === event.id && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
@@ -213,10 +215,18 @@ function EventsTab() {
 
 // ===================== OVERLAYS TAB =====================
 function OverlaysTab() {
-  const { locale, overlays, addOverlay, removeOverlay } = useStore();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
+  const { locale } = useStore();
   const he = locale === 'he';
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [overlays, setOverlays] = useState<OverlayData[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const loadOverlays = () => {
+    api.getOverlays().then((data) => { setOverlays(data); setLoading(false); });
+  };
+
+  useEffect(() => { loadOverlays(); }, []);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -225,45 +235,26 @@ function OverlaysTab() {
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const id = uuidv4();
-
-      try {
-        const formData = new FormData();
-        formData.append('overlay', file);
-        formData.append('eventId', id);
-
-        const res = await fetch('/api/upload-overlay', { method: 'POST', body: formData });
-        const data = await res.json();
-
-        addOverlay({
-          id,
-          name: file.name.replace(/\.[^.]+$/, ''),
-          url: data.url || URL.createObjectURL(file),
-          createdAt: new Date().toISOString(),
-        });
-      } catch {
-        // Fallback: save as data URL
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          addOverlay({
-            id,
-            name: file.name.replace(/\.[^.]+$/, ''),
-            url: ev.target?.result as string,
-            createdAt: new Date().toISOString(),
-          });
-        };
-        reader.readAsDataURL(file);
-      }
+      const name = file.name.replace(/\.[^.]+$/, '');
+      await api.uploadOverlay(file, name);
     }
 
     setUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
+    loadOverlays();
   };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm(he ? 'למחוק?' : 'Delete?')) return;
+    await api.deleteOverlay(id);
+    loadOverlays();
+  };
+
+  if (loading) return <div className="text-center py-10"><span className="text-3xl">⏳</span></div>;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <input ref={fileInputRef} type="file" accept="image/png" multiple className="hidden" onChange={handleUpload} />
-
       <button className="btn-glow w-full mb-5" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
         {uploading ? '⏳' : '+'} {he ? 'העלה מסגרות PNG' : 'Upload PNG Overlays'}
       </button>
@@ -271,8 +262,7 @@ function OverlaysTab() {
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {overlays.map((overlay, i) => (
           <motion.div key={overlay.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.04 }}
-            className="glass-card overflow-hidden group relative">
-            {/* Preview with checkerboard */}
+            className="glass-card overflow-hidden relative">
             <div className="aspect-[3/4] relative">
               <div className="absolute inset-0" style={{
                 backgroundImage: 'repeating-conic-gradient(#1a1a2e 0% 25%, #252540 0% 50%)',
@@ -282,12 +272,8 @@ function OverlaysTab() {
             </div>
             <div className="p-2 flex items-center justify-between">
               <p className="text-xs font-bold text-white/70 truncate flex-1">{overlay.name}</p>
-              <button
-                className="w-7 h-7 rounded-full bg-red-500/15 text-red-400 flex items-center justify-center text-xs active:bg-red-500/30 flex-shrink-0"
-                onClick={() => { if (confirm(he ? 'למחוק?' : 'Delete?')) removeOverlay(overlay.id); }}
-              >
-                ✕
-              </button>
+              <button className="w-7 h-7 rounded-full bg-red-500/15 text-red-400 flex items-center justify-center text-xs active:bg-red-500/30 flex-shrink-0"
+                onClick={() => handleDelete(overlay.id)}>✕</button>
             </div>
           </motion.div>
         ))}
@@ -306,90 +292,70 @@ function OverlaysTab() {
 
 // ===================== PHOTOS TAB =====================
 function PhotosTab() {
-  const { locale, events, printJobs, overlays } = useStore();
-  const [selectedEvent, setSelectedEvent] = useState<string>('all');
-  const [downloading, setDownloading] = useState(false);
+  const { locale } = useStore();
   const he = locale === 'he';
+  const [events, setEvents] = useState<EventData[]>([]);
+  const [photos, setPhotos] = useState<PhotoData[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState('all');
+  const [loading, setLoading] = useState(true);
 
-  const photos = selectedEvent === 'all'
-    ? printJobs
-    : printJobs.filter((j) => j.eventId === selectedEvent);
+  useEffect(() => {
+    Promise.all([api.getEvents(), api.getPhotos()]).then(([evs, phs]) => {
+      setEvents(evs); setPhotos(phs); setLoading(false);
+    });
+  }, []);
+
+  useEffect(() => {
+    api.getPhotos(selectedEvent === 'all' ? undefined : selectedEvent).then(setPhotos);
+  }, [selectedEvent]);
 
   const handleDownloadAll = async () => {
-    if (photos.length === 0) return;
-    setDownloading(true);
-
-    try {
-      // Simple download: create links for each photo
-      // For real ZIP, we'd use JSZip - for now download individually
-      for (const photo of photos) {
-        const link = document.createElement('a');
-        link.href = photo.compositeUrl || photo.photoUrl;
-        link.download = `photo_${photo.id.slice(0, 8)}.jpg`;
-        link.click();
-        await new Promise((r) => setTimeout(r, 300));
-      }
-    } catch (err) {
-      console.error('Download failed:', err);
+    for (const photo of photos) {
+      const link = document.createElement('a');
+      link.href = photo.photoUrl;
+      link.download = `photo_${photo.id.slice(0, 8)}.jpg`;
+      link.click();
+      await new Promise((r) => setTimeout(r, 300));
     }
-    setDownloading(false);
   };
+
+  if (loading) return <div className="text-center py-10"><span className="text-3xl">⏳</span></div>;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      {/* Event filter */}
       <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-        <button
-          className={`flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold transition-colors ${
-            selectedEvent === 'all' ? 'bg-primary text-white' : 'bg-white/8 text-white/60'
-          }`}
-          onClick={() => setSelectedEvent('all')}
-        >
-          {he ? 'הכל' : 'All'} ({printJobs.length})
+        <button className={`flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold ${selectedEvent === 'all' ? 'bg-primary text-white' : 'bg-white/8 text-white/60'}`}
+          onClick={() => setSelectedEvent('all')}>
+          {he ? 'הכל' : 'All'}
         </button>
-        {events.map((ev) => {
-          const count = printJobs.filter((j) => j.eventId === ev.id).length;
-          return (
-            <button key={ev.id}
-              className={`flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold transition-colors ${
-                selectedEvent === ev.id ? 'bg-primary text-white' : 'bg-white/8 text-white/60'
-              }`}
-              onClick={() => setSelectedEvent(ev.id)}
-            >
-              {ev.name} ({count})
-            </button>
-          );
-        })}
+        {events.map((ev) => (
+          <button key={ev.id} className={`flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold ${selectedEvent === ev.id ? 'bg-primary text-white' : 'bg-white/8 text-white/60'}`}
+            onClick={() => setSelectedEvent(ev.id)}>
+            {ev.name}
+          </button>
+        ))}
       </div>
 
-      {/* Download all */}
       {photos.length > 0 && (
-        <button className="btn-secondary w-full mb-4" onClick={handleDownloadAll} disabled={downloading}>
-          {downloading ? '⏳' : '📥'} {he ? `הורד הכל (${photos.length})` : `Download All (${photos.length})`}
+        <button className="btn-secondary w-full mb-4" onClick={handleDownloadAll}>
+          📥 {he ? `הורד הכל (${photos.length})` : `Download All (${photos.length})`}
         </button>
       )}
 
-      {/* Photo grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        {photos.map((photo, i) => {
-          const event = events.find((e) => e.id === photo.eventId);
-          const overlay = overlays.find((o) => o.id === photo.overlayId);
-          return (
-            <motion.div key={photo.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}
-              className="glass-card overflow-hidden">
-              <div className="aspect-[3/4] relative bg-black">
-                <img src={photo.photoUrl} alt="" className="w-full h-full object-cover" />
-                {overlay && (
-                  <img src={overlay.url} alt="" className="absolute inset-0 w-full h-full object-contain pointer-events-none" />
-                )}
-              </div>
-              <div className="p-2">
-                <p className="text-[10px] text-white/40 truncate">{event?.name}</p>
-                <p className="text-[10px] text-white/30">{new Date(photo.createdAt).toLocaleTimeString()}</p>
-              </div>
-            </motion.div>
-          );
-        })}
+        {photos.map((photo, i) => (
+          <motion.div key={photo.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}
+            className="glass-card overflow-hidden">
+            <div className="aspect-[3/4] relative bg-black">
+              <img src={photo.photoUrl} alt="" className="w-full h-full object-cover" />
+              {photo.overlay && <img src={photo.overlay.url} alt="" className="absolute inset-0 w-full h-full object-contain pointer-events-none" />}
+            </div>
+            <div className="p-2">
+              <p className="text-[10px] text-white/40 truncate">{photo.event?.name}</p>
+              <p className="text-[10px] text-white/30">{new Date(photo.createdAt).toLocaleTimeString()}</p>
+            </div>
+          </motion.div>
+        ))}
       </div>
 
       {photos.length === 0 && (
@@ -403,26 +369,19 @@ function PhotosTab() {
   );
 }
 
-// ===================== QR CODE DISPLAY =====================
+// ===================== QR CODE =====================
 function QRCodeDisplay({ eventId }: { eventId: string }) {
   const [qrSvg, setQrSvg] = useState<string>('');
-
   useEffect(() => {
-    const generateQR = async () => {
+    (async () => {
       try {
         const QRCode = (await import('qrcode')).default;
         const url = `${window.location.origin}/event/${eventId}`;
-        const svg = await QRCode.toString(url, {
-          type: 'svg', color: { dark: '#1a1a2e', light: '#ffffff' }, margin: 2, width: 200,
-        });
+        const svg = await QRCode.toString(url, { type: 'svg', color: { dark: '#1a1a2e', light: '#ffffff' }, margin: 2, width: 200 });
         setQrSvg(svg);
-      } catch (err) {
-        console.error('QR generation failed:', err);
-      }
-    };
-    generateQR();
+      } catch (err) { console.error('QR failed:', err); }
+    })();
   }, [eventId]);
-
   if (!qrSvg) return <div className="w-[180px] h-[180px] mx-auto bg-gray-100 animate-pulse rounded-xl" />;
   return <div className="inline-block" dangerouslySetInnerHTML={{ __html: qrSvg }} />;
 }

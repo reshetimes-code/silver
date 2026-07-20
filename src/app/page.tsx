@@ -1,18 +1,26 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '@/lib/store';
 import { t } from '@/lib/i18n';
 import { useHydrated } from '@/lib/use-hydrated';
+import { api } from '@/lib/api';
 import Logo from '@/components/ui/Logo';
 import LanguageToggle from '@/components/ui/LanguageToggle';
 import ParticleBackground from '@/components/ui/ParticleBackground';
 import Link from 'next/link';
 
+interface EventData { id: string; name: string; date: string; active: boolean; }
+
 export default function LandingPage() {
   const hydrated = useHydrated();
-  const { locale, events } = useStore();
-  const activeEvents = events.filter((e) => e.active);
+  const { locale } = useStore();
+  const [activeEvents, setActiveEvents] = useState<EventData[]>([]);
+
+  useEffect(() => {
+    api.getEvents().then((evs: EventData[]) => setActiveEvents(evs.filter((e) => e.active)));
+  }, []);
 
   if (!hydrated) return null;
 
