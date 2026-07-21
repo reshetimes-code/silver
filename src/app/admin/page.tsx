@@ -371,13 +371,37 @@ function PhotosTab() {
         {photos.map((photo, i) => (
           <motion.div key={photo.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}
             className="glass-card overflow-hidden">
-            <div className="aspect-[3/4] relative bg-black">
-              <img src={photo.photoUrl} alt="" className="w-full h-full object-cover" />
-              {photo.overlay && <img src={photo.overlay.url} alt="" className="absolute inset-0 w-full h-full object-contain pointer-events-none" />}
+            <div className="relative bg-black">
+              {/* PNG overlay defines size, photo behind */}
+              {photo.overlay ? (
+                <div className="relative">
+                  <img src={photo.overlay.url} alt="" className="relative w-full h-auto block z-10 pointer-events-none" />
+                  <img src={photo.photoUrl} alt="" className="absolute inset-0 w-full h-full object-cover z-0" />
+                </div>
+              ) : (
+                <img src={photo.photoUrl} alt="" className="w-full aspect-[3/4] object-cover" />
+              )}
             </div>
             <div className="p-2">
               <p className="text-[10px] text-white/40 truncate">{photo.event?.name}</p>
-              <p className="text-[10px] text-white/30">{new Date(photo.createdAt).toLocaleTimeString()}</p>
+              <p className="text-[10px] text-white/30 mb-2">{new Date(photo.createdAt).toLocaleTimeString()}</p>
+              <div className="flex gap-1.5">
+                <button className="flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-white/8 text-white/60 active:bg-white/15"
+                  onClick={() => {
+                    const link = document.createElement('a');
+                    link.href = photo.photoUrl;
+                    link.download = `photo_${photo.id.slice(0, 8)}.jpg`;
+                    link.click();
+                  }}>
+                  📥
+                </button>
+                <button className="flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-green-500/15 text-green-400 active:bg-green-500/25"
+                  onClick={() => {
+                    window.open(`https://wa.me/?text=${encodeURIComponent('Check out this photo! 📸')}`, '_blank');
+                  }}>
+                  WhatsApp
+                </button>
+              </div>
             </div>
           </motion.div>
         ))}
