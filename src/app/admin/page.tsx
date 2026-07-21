@@ -202,6 +202,9 @@ function EventsTab() {
                 <Link href={`/admin/event/${event.id}/qr`} className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold bg-purple-500/15 text-purple-400 active:bg-purple-500/25">
                   {he ? 'עמוד QR' : 'QR Page'}
                 </Link>
+                <Link href={`/event/${event.id}`} className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold bg-green-500/15 text-green-400 active:bg-green-500/25">
+                  {he ? 'כניסה' : 'Enter'} 🚀
+                </Link>
                 <button className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold bg-blue-500/15 text-blue-400 active:bg-blue-500/25"
                   onClick={() => startEdit(event.id)}>{he ? 'ערוך' : 'Edit'}</button>
                 <button className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold bg-white/8 text-white/60 active:bg-white/15"
