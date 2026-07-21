@@ -10,9 +10,9 @@ export default function LanguageToggle() {
   return (
     <motion.button
       onClick={toggleLocale}
-      className="fixed top-3 right-3 z-50 px-3 py-1.5 rounded-full text-xs font-bold
+      className="fixed bottom-4 left-4 z-50 px-3 py-1.5 rounded-full text-xs font-bold
         bg-white/10 backdrop-blur-md border border-white/20 text-white active:scale-95 transition-transform"
-      style={{ paddingTop: 'calc(6px + var(--safe-top, 0px))' }}
+      style={{ paddingBottom: 'calc(6px + var(--safe-bottom, 0px))' }}
       whileTap={{ scale: 0.9 }}
     >
       {t(locale, 'switchLang')}

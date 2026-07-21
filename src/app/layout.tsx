@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import AccessibilityWidget from "@/components/ui/AccessibilityWidget";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -52,6 +53,7 @@ export default function RootLayout({
       <body className="min-h-dvh bg-party disco-lights overscroll-none">
         <div className="disco-light-extra" />
         {children}
+        <AccessibilityWidget />
       </body>
     </html>
   );
