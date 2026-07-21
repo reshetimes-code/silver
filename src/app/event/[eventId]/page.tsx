@@ -119,8 +119,9 @@ export default function CapturePhotoPage() {
         </div>
       </div>
 
-      <div className="px-5 py-3 relative z-10">
-        <h2 className="text-lg font-bold text-white text-center">{event.name}</h2>
+      <div className="px-5 py-3 relative z-10 text-center">
+        <h2 className="text-lg font-bold text-white">{event.name}</h2>
+        <p className="text-sm text-white/50 mt-0.5">{event.date.replace(/-/g, '.')}</p>
       </div>
 
       <main className="flex-1 flex flex-col items-center justify-center px-5 pb-8 relative z-10">
