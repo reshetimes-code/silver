@@ -50,7 +50,7 @@ export const translations = {
     // Common
     loading: 'Loading...',
     error: 'Something went wrong',
-    switchLang: 'עברית',
+    switchLang: 'HEB',
   },
   he: {
     // Landing
@@ -101,7 +101,7 @@ export const translations = {
     // Common
     loading: 'טוען...',
     error: 'משהו השתבש',
-    switchLang: 'English',
+    switchLang: 'ENG',
   },
 } as const;
 

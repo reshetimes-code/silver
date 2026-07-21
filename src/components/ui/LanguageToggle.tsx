@@ -5,7 +5,9 @@ import { t } from '@/lib/i18n';
 import { motion } from 'framer-motion';
 
 export default function LanguageToggle() {
-  const { locale, toggleLocale } = useStore();
+  const { locale, toggleLocale, showLanguageToggle } = useStore();
+
+  if (!showLanguageToggle) return null;
 
   return (
     <motion.button

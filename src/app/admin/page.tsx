@@ -67,7 +67,7 @@ export default function AdminPage() {
 
 // ===================== EVENTS TAB =====================
 function EventsTab() {
-  const { locale } = useStore();
+  const { locale, showLanguageToggle, setShowLanguageToggle } = useStore();
   const he = locale === 'he';
   const [events, setEvents] = useState<EventData[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -125,6 +125,25 @@ function EventsTab() {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      {/* Language toggle switch */}
+      <div className="glass-card p-4 mb-4 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-bold text-white/80">Show Language Button</p>
+          <p className="text-[10px] text-white/40">Show/hide HEB/ENG toggle for guests</p>
+        </div>
+        <button
+          className={`w-12 h-7 rounded-full relative transition-colors ${showLanguageToggle ? 'bg-primary' : 'bg-white/20'}`}
+          onClick={() => setShowLanguageToggle(!showLanguageToggle)}
+        >
+          <motion.div
+            className="w-5.5 h-5.5 bg-white rounded-full absolute top-[3px]"
+            style={{ width: 22, height: 22 }}
+            animate={{ left: showLanguageToggle ? '22px' : '3px' }}
+            transition={{ type: 'spring', damping: 20 }}
+          />
+        </button>
+      </div>
+
       <button className="btn-glow w-full mb-5" onClick={() => { resetForm(); setShowForm(true); }}>
         + {he ? 'אירוע חדש' : 'New Event'}
       </button>

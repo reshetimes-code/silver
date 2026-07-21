@@ -34,6 +34,9 @@ interface AppState {
   setLocale: (locale: Locale) => void;
   toggleLocale: () => void;
 
+  showLanguageToggle: boolean;
+  setShowLanguageToggle: (show: boolean) => void;
+
   // Global overlays library
   overlays: Overlay[];
   addOverlay: (overlay: Overlay) => void;
@@ -62,6 +65,9 @@ export const useStore = create<AppState>()(
       locale: 'en',
       setLocale: (locale) => set({ locale }),
       toggleLocale: () => set((s) => ({ locale: s.locale === 'en' ? 'he' : 'en' })),
+
+      showLanguageToggle: true,
+      setShowLanguageToggle: (show) => set({ showLanguageToggle: show }),
 
       // Overlays
       overlays: [],
