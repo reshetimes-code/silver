@@ -44,16 +44,6 @@ export default function LandingPage() {
           <Logo size="lg" />
         </motion.div>
 
-        {/* Tagline */}
-        <motion.p
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="text-base sm:text-xl text-white/60 text-center mb-8 max-w-xs sm:max-w-md"
-        >
-          {t(locale, 'scanQR')}
-        </motion.p>
-
         {/* Animated QR */}
         <motion.div
           initial={{ opacity: 0, scale: 0.5 }}
