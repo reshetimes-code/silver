@@ -170,7 +170,7 @@ export default function PreviewPage() {
           {selectedOverlayId === 'none' ? (
             <div className="rounded-2xl overflow-hidden shadow-2xl"><img src={image} alt="Your photo" className="w-full" /></div>
           ) : (
-            <OverlayRenderer overlayUrl={selectedOverlay?.url || ''}><img src={image} alt="Your photo" className="w-full object-cover" /></OverlayRenderer>
+            <OverlayRenderer overlayUrl={selectedOverlay?.url || ''}><img src={image} alt="Your photo" className="w-full h-full object-cover absolute inset-0" /></OverlayRenderer>
           )}
         </motion.div>
       </main>

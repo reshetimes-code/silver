@@ -4,8 +4,8 @@ import React from 'react';
 import { motion } from 'framer-motion';
 
 interface OverlayRendererProps {
-  overlayUrl: string; // PNG overlay image URL
-  children: React.ReactNode; // The photo underneath
+  overlayUrl: string;
+  children: React.ReactNode;
 }
 
 export default function OverlayRenderer({ overlayUrl, children }: OverlayRendererProps) {
@@ -16,18 +16,18 @@ export default function OverlayRenderer({ overlayUrl, children }: OverlayRendere
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.4, type: 'spring' }}
     >
-      {/* Photo layer - underneath */}
-      <div className="relative w-full">
-        {children}
-      </div>
-
-      {/* PNG Overlay - on top, absolute positioned */}
+      {/* PNG overlay defines the size - it's the container */}
       <img
         src={overlayUrl}
-        alt="Overlay"
-        className="absolute inset-0 w-full h-full object-contain pointer-events-none z-10"
+        alt="Frame"
+        className="relative w-full h-auto block z-10 pointer-events-none"
         draggable={false}
       />
+
+      {/* Photo sits behind the PNG, exactly the same size */}
+      <div className="absolute inset-0 z-0">
+        {children}
+      </div>
     </motion.div>
   );
 }
