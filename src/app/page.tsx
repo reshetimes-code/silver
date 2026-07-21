@@ -99,7 +99,7 @@ export default function LandingPage() {
                         <h4 className="text-base font-bold text-white truncate group-active:text-primary transition-colors">
                           {event.name}
                         </h4>
-                        <p className="text-xs text-white/40 mt-0.5">{event.date}</p>
+                        <p className="text-xs text-white/40 mt-0.5">{event.date.replace(/-/g, '.')}</p>
                       </div>
                       <div className="flex-shrink-0 ml-3 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                         <span className="text-lg">📸</span>

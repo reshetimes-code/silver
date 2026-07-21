@@ -87,7 +87,7 @@ export default function QRDisplayPage() {
         </motion.h1>
         <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
           className="text-sm text-white/50 mb-8">
-          {event.date}
+          {event.date.replace(/-/g, '.')}
         </motion.p>
 
         <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.4, type: 'spring', damping: 12 }}

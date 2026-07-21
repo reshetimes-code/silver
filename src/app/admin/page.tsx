@@ -190,7 +190,7 @@ function EventsTab() {
               <div className="flex items-start justify-between mb-2">
                 <div>
                   <h3 className="text-base font-bold text-white">{event.name}</h3>
-                  <p className="text-xs text-white/40">{event.date}</p>
+                  <p className="text-xs text-white/40">{event.date.replace(/-/g, '.')}</p>
                 </div>
                 <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${event.active ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
                   {event.active ? (he ? 'פעיל' : 'Active') : (he ? 'כבוי' : 'Off')}
