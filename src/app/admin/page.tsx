@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Swal from 'sweetalert2';
 import { useStore } from '@/lib/store';
 import { t } from '@/lib/i18n';
 import { useHydrated } from '@/lib/use-hydrated';
@@ -92,7 +93,10 @@ function EventsTab() {
   const handleSave = async () => {
     const errs = { name: !name.trim(), date: !date };
     setErrors(errs);
-    if (errs.name || errs.date) return;
+    if (errs.name || errs.date) {
+      Swal.fire({ icon: 'warning', title: he ? 'שדות חסרים' : 'Missing Fields', text: he ? 'נא למלא שם אירוע ותאריך' : 'Please fill in event name and date', background: '#1a1a2e', color: '#fff', confirmButtonColor: '#e94560' });
+      return;
+    }
 
     if (editingId) {
       await api.updateEvent(editingId, { name, date, maxPrintsPerDevice: maxPrints });
@@ -101,6 +105,7 @@ function EventsTab() {
     }
     resetForm();
     loadEvents();
+    Swal.fire({ icon: 'success', title: he ? 'נשמר!' : 'Saved!', timer: 1500, showConfirmButton: false, background: '#1a1a2e', color: '#fff' });
   };
 
   const startEdit = (id: string) => {
@@ -111,9 +116,11 @@ function EventsTab() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm(he ? 'למחוק?' : 'Delete?')) return;
+    const result = await Swal.fire({ icon: 'warning', title: he ? 'למחוק אירוע?' : 'Delete event?', text: he ? 'כל התמונות של האירוע יימחקו' : 'All photos for this event will be deleted', showCancelButton: true, confirmButtonColor: '#e94560', cancelButtonColor: '#333', confirmButtonText: he ? 'מחק' : 'Delete', cancelButtonText: he ? 'ביטול' : 'Cancel', background: '#1a1a2e', color: '#fff' });
+    if (!result.isConfirmed) return;
     await api.deleteEvent(id);
     loadEvents();
+    Swal.fire({ icon: 'success', title: he ? 'נמחק!' : 'Deleted!', timer: 1500, showConfirmButton: false, background: '#1a1a2e', color: '#fff' });
   };
 
   const handleToggle = async (id: string, active: boolean) => {
@@ -269,8 +276,9 @@ function OverlaysTab() {
     loadOverlays();
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm(he ? 'למחוק?' : 'Delete?')) return;
+  const handleDeleteOverlay = async (id: string) => {
+    const result = await Swal.fire({ icon: 'warning', title: he ? 'למחוק מסגרת?' : 'Delete overlay?', showCancelButton: true, confirmButtonColor: '#e94560', cancelButtonColor: '#333', confirmButtonText: he ? 'מחק' : 'Delete', cancelButtonText: he ? 'ביטול' : 'Cancel', background: '#1a1a2e', color: '#fff' });
+    if (!result.isConfirmed) return;
     await api.deleteOverlay(id);
     loadOverlays();
   };
@@ -298,7 +306,7 @@ function OverlaysTab() {
             <div className="p-2 flex items-center justify-between">
               <p className="text-xs font-bold text-white/70 truncate flex-1">{overlay.name}</p>
               <button className="w-7 h-7 rounded-full bg-red-500/15 text-red-400 flex items-center justify-center text-xs active:bg-red-500/30 flex-shrink-0"
-                onClick={() => handleDelete(overlay.id)}>✕</button>
+                onClick={() => handleDeleteOverlay(overlay.id)}>✕</button>
             </div>
           </motion.div>
         ))}
@@ -350,7 +358,8 @@ function PhotosTab() {
   };
 
   const handleDeletePhoto = async (photoId: string) => {
-    if (!confirm(he ? 'למחוק תמונה?' : 'Delete photo?')) return;
+    const result = await Swal.fire({ icon: 'warning', title: he ? 'למחוק תמונה?' : 'Delete photo?', showCancelButton: true, confirmButtonColor: '#e94560', cancelButtonColor: '#333', confirmButtonText: he ? 'מחק' : 'Delete', cancelButtonText: he ? 'ביטול' : 'Cancel', background: '#1a1a2e', color: '#fff' });
+    if (!result.isConfirmed) return;
     await api.deletePhoto(photoId);
     setPhotos((prev) => prev.filter((p) => p.id !== photoId));
     setPhotoCounts((prev) => ({
@@ -361,10 +370,12 @@ function PhotosTab() {
 
   const handleDeleteAllPhotos = async () => {
     if (!selectedEventId) return;
-    if (!confirm(he ? 'למחוק את כל התמונות של האירוע?' : 'Delete ALL photos for this event?')) return;
+    const result = await Swal.fire({ icon: 'error', title: he ? 'למחוק את כל התמונות?' : 'Delete ALL photos?', text: he ? 'פעולה זו לא ניתנת לביטול!' : 'This action cannot be undone!', showCancelButton: true, confirmButtonColor: '#e94560', cancelButtonColor: '#333', confirmButtonText: he ? 'מחק הכל' : 'Delete All', cancelButtonText: he ? 'ביטול' : 'Cancel', background: '#1a1a2e', color: '#fff' });
+    if (!result.isConfirmed) return;
     await api.deleteEventPhotos(selectedEventId);
     setPhotos([]);
     setPhotoCounts((prev) => ({ ...prev, [selectedEventId]: 0 }));
+    Swal.fire({ icon: 'success', title: he ? 'כל התמונות נמחקו' : 'All photos deleted', timer: 1500, showConfirmButton: false, background: '#1a1a2e', color: '#fff' });
   };
 
   const handleDownloadAll = async () => {

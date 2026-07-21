@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import Swal from 'sweetalert2';
 import Logo from './Logo';
 import ParticleBackground from './ParticleBackground';
 
@@ -26,6 +27,7 @@ export default function AdminAuth({ children }: { children: React.ReactNode }) {
       setError(false);
     } else {
       setError(true);
+      Swal.fire({ icon: 'error', title: 'Wrong Password', text: 'Please try again', background: '#1a1a2e', color: '#fff', confirmButtonColor: '#e94560' });
     }
   };
 
