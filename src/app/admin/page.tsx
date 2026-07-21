@@ -8,6 +8,7 @@ import { useHydrated } from '@/lib/use-hydrated';
 import { api } from '@/lib/api';
 import LanguageToggle from '@/components/ui/LanguageToggle';
 import Logo from '@/components/ui/Logo';
+import AdminAuth from '@/components/ui/AdminAuth';
 import ParticleBackground from '@/components/ui/ParticleBackground';
 import Link from 'next/link';
 
@@ -27,6 +28,7 @@ export default function AdminPage() {
   if (!hydrated) return null;
 
   return (
+    <AdminAuth>
     <div className="min-h-dvh relative" dir={isRtl ? 'rtl' : 'ltr'}>
       <ParticleBackground />
       <LanguageToggle />
@@ -59,6 +61,7 @@ export default function AdminPage() {
         </AnimatePresence>
       </div>
     </div>
+    </AdminAuth>
   );
 }
 
