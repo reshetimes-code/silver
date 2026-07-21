@@ -320,19 +320,52 @@ function PhotosTab() {
   const { locale } = useStore();
   const he = locale === 'he';
   const [events, setEvents] = useState<EventData[]>([]);
+  const [photoCounts, setPhotoCounts] = useState<Record<string, number>>({});
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [photos, setPhotos] = useState<PhotoData[]>([]);
-  const [selectedEvent, setSelectedEvent] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
 
-  useEffect(() => {
-    Promise.all([api.getEvents(), api.getPhotos()]).then(([evs, phs]) => {
-      setEvents(evs); setPhotos(phs); setLoading(false);
-    });
-  }, []);
+  const loadEvents = async () => {
+    const evs = await api.getEvents();
+    setEvents(evs);
+    // Get photo count per event
+    const counts: Record<string, number> = {};
+    const allPhotos = await api.getPhotos();
+    for (const p of allPhotos) {
+      counts[p.eventId] = (counts[p.eventId] || 0) + 1;
+    }
+    setPhotoCounts(counts);
+    setLoading(false);
+  };
 
-  useEffect(() => {
-    api.getPhotos(selectedEvent === 'all' ? undefined : selectedEvent).then(setPhotos);
-  }, [selectedEvent]);
+  useEffect(() => { loadEvents(); }, []);
+
+  const openGallery = async (eventId: string) => {
+    setSelectedEventId(eventId);
+    setLoadingPhotos(true);
+    const p = await api.getPhotos(eventId);
+    setPhotos(p);
+    setLoadingPhotos(false);
+  };
+
+  const handleDeletePhoto = async (photoId: string) => {
+    if (!confirm(he ? 'למחוק תמונה?' : 'Delete photo?')) return;
+    await api.deletePhoto(photoId);
+    setPhotos((prev) => prev.filter((p) => p.id !== photoId));
+    setPhotoCounts((prev) => ({
+      ...prev,
+      [selectedEventId!]: (prev[selectedEventId!] || 1) - 1,
+    }));
+  };
+
+  const handleDeleteAllPhotos = async () => {
+    if (!selectedEventId) return;
+    if (!confirm(he ? 'למחוק את כל התמונות של האירוע?' : 'Delete ALL photos for this event?')) return;
+    await api.deleteEventPhotos(selectedEventId);
+    setPhotos([]);
+    setPhotoCounts((prev) => ({ ...prev, [selectedEventId]: 0 }));
+  };
 
   const handleDownloadAll = async () => {
     for (const photo of photos) {
@@ -344,74 +377,138 @@ function PhotosTab() {
     }
   };
 
+  const handleShareGallery = () => {
+    if (!selectedEventId) return;
+    const url = `${window.location.origin}/admin`;
+    const event = events.find((e) => e.id === selectedEventId);
+    const text = `📸 ${event?.name || 'Event'} Gallery - ${photos.length} photos`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text + '\n' + url)}`, '_blank');
+  };
+
   if (loading) return <div className="text-center py-10"><span className="text-3xl">⏳</span></div>;
 
+  // ===== GALLERY VIEW (inside an event) =====
+  if (selectedEventId) {
+    const event = events.find((e) => e.id === selectedEventId);
+
+    if (loadingPhotos) return <div className="text-center py-10"><span className="text-3xl">⏳</span></div>;
+
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        {/* Back + title */}
+        <button className="text-sm text-white/50 mb-3 active:text-white" onClick={() => setSelectedEventId(null)}>
+          ← {he ? 'חזרה לאירועים' : 'Back to events'}
+        </button>
+
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-bold text-white">{event?.name}</h3>
+            <p className="text-xs text-white/40">{photos.length} {he ? 'תמונות' : 'photos'}</p>
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        {photos.length > 0 && (
+          <div className="flex gap-2 mb-4">
+            <button className="btn-secondary flex-1 text-xs" onClick={handleDownloadAll}>
+              📥 {he ? 'הורד הכל' : 'Download All'}
+            </button>
+            <button className="flex-1 py-2 rounded-2xl text-xs font-bold bg-green-500/15 text-green-400 active:bg-green-500/25 border border-green-500/20"
+              onClick={handleShareGallery}>
+              📤 WhatsApp
+            </button>
+            <button className="flex-1 py-2 rounded-2xl text-xs font-bold bg-red-500/15 text-red-400 active:bg-red-500/25 border border-red-500/20"
+              onClick={handleDeleteAllPhotos}>
+              🗑️ {he ? 'מחק הכל' : 'Delete All'}
+            </button>
+          </div>
+        )}
+
+        {/* Photo grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {photos.map((photo, i) => (
+            <motion.div key={photo.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}
+              className="glass-card overflow-hidden">
+              <div className="relative bg-black">
+                {photo.overlay ? (
+                  <div className="relative">
+                    <img src={photo.overlay.url} alt="" className="relative w-full h-auto block z-10 pointer-events-none" />
+                    <img src={photo.photoUrl} alt="" className="absolute inset-0 w-full h-full object-cover z-0" />
+                  </div>
+                ) : (
+                  <img src={photo.photoUrl} alt="" className="w-full aspect-[3/4] object-cover" />
+                )}
+              </div>
+              <div className="p-2">
+                <p className="text-[10px] text-white/30 mb-2">{new Date(photo.createdAt).toLocaleTimeString()}</p>
+                <div className="flex gap-1.5">
+                  <button className="flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-white/8 text-white/60 active:bg-white/15"
+                    onClick={() => {
+                      const link = document.createElement('a');
+                      link.href = photo.photoUrl;
+                      link.download = `photo_${photo.id.slice(0, 8)}.jpg`;
+                      link.click();
+                    }}>
+                    📥
+                  </button>
+                  <button className="flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-green-500/15 text-green-400 active:bg-green-500/25"
+                    onClick={() => {
+                      window.open(`https://wa.me/?text=${encodeURIComponent('📸 Photo from ' + (event?.name || 'event'))}`, '_blank');
+                    }}>
+                    📤
+                  </button>
+                  <button className="flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-red-500/15 text-red-400 active:bg-red-500/25"
+                    onClick={() => handleDeletePhoto(photo.id)}>
+                    🗑️
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        {photos.length === 0 && (
+          <div className="glass-card p-10 text-center">
+            <span className="text-5xl block mb-3">📸</span>
+            <h3 className="text-lg font-bold text-white mb-1">{he ? 'אין תמונות באירוע' : 'No photos in this event'}</h3>
+          </div>
+        )}
+      </motion.div>
+    );
+  }
+
+  // ===== EVENTS TABLE VIEW =====
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-        <button className={`flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold ${selectedEvent === 'all' ? 'bg-primary text-white' : 'bg-white/8 text-white/60'}`}
-          onClick={() => setSelectedEvent('all')}>
-          {he ? 'הכל' : 'All'}
-        </button>
-        {events.map((ev) => (
-          <button key={ev.id} className={`flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold ${selectedEvent === ev.id ? 'bg-primary text-white' : 'bg-white/8 text-white/60'}`}
-            onClick={() => setSelectedEvent(ev.id)}>
-            {ev.name}
-          </button>
-        ))}
-      </div>
+      <h3 className="text-sm font-bold text-white/50 mb-3">{he ? 'בחר אירוע לצפייה בגלריה' : 'Select event to view gallery'}</h3>
 
-      {photos.length > 0 && (
-        <button className="btn-secondary w-full mb-4" onClick={handleDownloadAll}>
-          📥 {he ? `הורד הכל (${photos.length})` : `Download All (${photos.length})`}
-        </button>
-      )}
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        {photos.map((photo, i) => (
-          <motion.div key={photo.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}
-            className="glass-card overflow-hidden">
-            <div className="relative bg-black">
-              {/* PNG overlay defines size, photo behind */}
-              {photo.overlay ? (
-                <div className="relative">
-                  <img src={photo.overlay.url} alt="" className="relative w-full h-auto block z-10 pointer-events-none" />
-                  <img src={photo.photoUrl} alt="" className="absolute inset-0 w-full h-full object-cover z-0" />
-                </div>
-              ) : (
-                <img src={photo.photoUrl} alt="" className="w-full aspect-[3/4] object-cover" />
-              )}
-            </div>
-            <div className="p-2">
-              <p className="text-[10px] text-white/40 truncate">{photo.event?.name}</p>
-              <p className="text-[10px] text-white/30 mb-2">{new Date(photo.createdAt).toLocaleTimeString()}</p>
-              <div className="flex gap-1.5">
-                <button className="flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-white/8 text-white/60 active:bg-white/15"
-                  onClick={() => {
-                    const link = document.createElement('a');
-                    link.href = photo.photoUrl;
-                    link.download = `photo_${photo.id.slice(0, 8)}.jpg`;
-                    link.click();
-                  }}>
-                  📥
-                </button>
-                <button className="flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-green-500/15 text-green-400 active:bg-green-500/25"
-                  onClick={() => {
-                    window.open(`https://wa.me/?text=${encodeURIComponent('Check out this photo! 📸')}`, '_blank');
-                  }}>
-                  WhatsApp
-                </button>
+      <div className="space-y-3">
+        {events.map((event, i) => {
+          const count = photoCounts[event.id] || 0;
+          return (
+            <motion.button key={event.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
+              className="glass-card p-4 w-full flex items-center justify-between active:scale-[0.98] transition-transform text-left"
+              onClick={() => openGallery(event.id)}>
+              <div className="min-w-0 flex-1">
+                <h4 className="text-base font-bold text-white">{event.name}</h4>
+                <p className="text-xs text-white/40">{event.date.replace(/-/g, '.')}</p>
               </div>
-            </div>
-          </motion.div>
-        ))}
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <div className="text-center">
+                  <p className="text-lg font-bold text-primary">{count}</p>
+                  <p className="text-[10px] text-white/40">{he ? 'תמונות' : 'photos'}</p>
+                </div>
+                <span className="text-white/30">›</span>
+              </div>
+            </motion.button>
+          );
+        })}
       </div>
 
-      {photos.length === 0 && (
+      {events.length === 0 && (
         <div className="glass-card p-10 text-center">
           <span className="text-5xl block mb-3">📸</span>
-          <h3 className="text-lg font-bold text-white mb-1">{he ? 'אין תמונות עדיין' : 'No photos yet'}</h3>
-          <p className="text-sm text-white/40">{he ? 'תמונות מהאורחים יופיעו כאן' : 'Guest photos will appear here'}</p>
+          <h3 className="text-lg font-bold text-white mb-1">{he ? 'אין אירועים' : 'No events'}</h3>
         </div>
       )}
     </motion.div>

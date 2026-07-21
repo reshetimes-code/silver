@@ -48,4 +48,13 @@ export const api = {
     const res = await fetch(`${BASE}/api/photos`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
     return res.json();
   },
+  async deletePhoto(id: string) {
+    await fetch(`${BASE}/api/photos/${id}`, { method: 'DELETE' });
+  },
+  async deleteEventPhotos(eventId: string) {
+    const photos = await api.getPhotos(eventId);
+    for (const p of photos) {
+      await fetch(`${BASE}/api/photos/${p.id}`, { method: 'DELETE' });
+    }
+  },
 };
