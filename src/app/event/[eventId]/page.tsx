@@ -21,6 +21,9 @@ interface EventData {
   active: boolean;
 }
 
+const TIMER_OPTIONS = [0, 3, 5, 10] as const;
+type TimerValue = typeof TIMER_OPTIONS[number];
+
 export default function CapturePhotoPage() {
   const params = useParams();
   const router = useRouter();
@@ -33,10 +36,14 @@ export default function CapturePhotoPage() {
   const [mode, setMode] = useState<'choose' | 'camera' | 'upload'>('choose');
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+  const [timerSeconds, setTimerSeconds] = useState<TimerValue>(0);
+  const [countdown, setCountdown] = useState<number | null>(null);
   const webcamRef = useRef<Webcam>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isRtl = locale === 'he';
+  const he = locale === 'he';
 
   useEffect(() => {
     api.getEvent(eventId).then((data) => {
@@ -45,10 +52,49 @@ export default function CapturePhotoPage() {
     });
   }, [eventId]);
 
-  const capture = useCallback(() => {
+  useEffect(() => {
+    return () => {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, []);
+
+  const captureNow = useCallback(() => {
     const imageSrc = webcamRef.current?.getScreenshot();
     if (imageSrc) setCapturedImage(imageSrc);
   }, []);
+
+  const cancelTimer = useCallback(() => {
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+    setCountdown(null);
+  }, []);
+
+  const capture = useCallback(() => {
+    // Prevent double-tap while timer is running
+    if (countdownRef.current) return;
+
+    if (timerSeconds === 0) {
+      captureNow();
+      return;
+    }
+
+    let remaining = timerSeconds;
+    setCountdown(remaining);
+
+    countdownRef.current = setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearInterval(countdownRef.current!);
+        countdownRef.current = null;
+        setCountdown(null);
+        captureNow();
+      } else {
+        setCountdown(remaining);
+      }
+    }, 1000);
+  }, [timerSeconds, captureNow]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -119,12 +165,12 @@ export default function CapturePhotoPage() {
         </div>
       </div>
 
-      <div className="px-5 py-3 relative z-10 text-center">
+      <div className="px-5 py-2 relative z-10 text-center">
         <h2 className="text-lg font-bold text-white">{event.name}</h2>
         <p className="text-sm text-white/50 mt-0.5">{event.date.replace(/-/g, '.')}</p>
       </div>
 
-      <main className="flex-1 flex flex-col items-center justify-center px-5 pb-8 relative z-10">
+      <main className="flex-1 flex flex-col items-center justify-center px-3 pb-6 relative z-10">
         <AnimatePresence mode="wait">
           {mode === 'choose' && !capturedImage && (
             <motion.div key="choose" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
@@ -146,20 +192,70 @@ export default function CapturePhotoPage() {
 
           {mode === 'camera' && !capturedImage && (
             <motion.div key="camera" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="w-full max-w-md flex flex-col items-center gap-5">
-              <div className="camera-viewfinder w-full">
-                <Webcam ref={webcamRef} audio={false} screenshotFormat="image/jpeg" screenshotQuality={0.92}
-                  videoConstraints={{ facingMode, width: { ideal: 1280 }, height: { ideal: 960 } }}
+              className="w-full max-w-lg flex flex-col items-center gap-4">
+              {/* Timer selector */}
+              <div className="flex items-center gap-2" style={{ opacity: countdown !== null ? 0.4 : 1, pointerEvents: countdown !== null ? 'none' : 'auto' }}>
+                <span className="text-xs text-white/50">{he ? 'טיימר:' : 'Timer:'}</span>
+                {TIMER_OPTIONS.map((sec) => (
+                  <button key={sec}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${timerSeconds === sec
+                      ? 'bg-primary text-white'
+                      : 'bg-white/10 text-white/60 active:bg-white/20'}`}
+                    onClick={() => { setTimerSeconds(sec); cancelTimer(); }}>
+                    {sec === 0 ? (he ? 'ללא' : 'Off') : `${sec}s`}
+                  </button>
+                ))}
+              </div>
+
+              <div className="camera-viewfinder camera-viewfinder-main w-full">
+                <Webcam key={facingMode} ref={webcamRef} audio={false} screenshotFormat="image/jpeg" screenshotQuality={0.92}
+                  videoConstraints={{ facingMode, width: { ideal: 1920 }, height: { ideal: 1440 } }}
                   className="w-full rounded-2xl" mirrored={facingMode === 'user'} />
                 <div className="viewfinder-corner tl" /><div className="viewfinder-corner tr" />
                 <div className="viewfinder-corner bl" /><div className="viewfinder-corner br" />
+
+                {/* Countdown overlay */}
+                <AnimatePresence>
+                  {countdown !== null && (
+                    <motion.div
+                      className="absolute inset-0 flex items-center justify-center rounded-2xl z-10"
+                      style={{ background: 'rgba(0,0,0,0.4)' }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                    >
+                      <motion.span
+                        key={countdown}
+                        initial={{ scale: 2, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.5, opacity: 0 }}
+                        transition={{ type: 'spring', damping: 12 }}
+                        className="countdown-number"
+                      >
+                        {countdown}
+                      </motion.span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
+
               <div className="flex items-center justify-center gap-8">
-                <button className="control-btn" onClick={() => setMode('choose')}>✕</button>
-                <motion.button className="shutter-btn" whileTap={{ scale: 0.85 }} onClick={capture}>
-                  <div className="shutter-btn-inner" />
-                </motion.button>
-                <button className="control-btn" onClick={() => setFacingMode((f) => f === 'user' ? 'environment' : 'user')}>🔄</button>
+                <button className="control-btn" onClick={() => { cancelTimer(); setMode('choose'); }}>✕</button>
+                {countdown !== null ? (
+                  <motion.button className="shutter-btn" whileTap={{ scale: 0.85 }} onClick={cancelTimer}
+                    style={{ background: 'linear-gradient(135deg, #666, #888)' }}>
+                    <span className="text-white text-2xl font-bold">■</span>
+                  </motion.button>
+                ) : (
+                  <motion.button className="shutter-btn" whileTap={{ scale: 0.85 }} onClick={capture}>
+                    <div className="shutter-btn-inner" />
+                    {timerSeconds > 0 && (
+                      <span className="absolute text-white text-xs font-bold">{timerSeconds}s</span>
+                    )}
+                  </motion.button>
+                )}
+                <button className="control-btn" disabled={countdown !== null} style={{ opacity: countdown !== null ? 0.4 : 1 }}
+                  onClick={() => setFacingMode((f) => f === 'user' ? 'environment' : 'user')}>🔄</button>
               </div>
             </motion.div>
           )}

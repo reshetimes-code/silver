@@ -131,9 +131,9 @@ export default function PreviewPage() {
             {overlays.map((overlay, i) => (
               <motion.button key={overlay.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }}
                 className="glass-card overflow-hidden active:scale-95 transition-transform" onClick={() => setSelectedOverlayId(overlay.id)}>
-                <div className="aspect-[3/4] relative">
-                  <img src={image} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                  <img src={overlay.url} alt={overlay.name} className="absolute inset-0 w-full h-full object-contain" />
+                <div className="relative overflow-hidden">
+                  <img src={overlay.url} alt={overlay.name} className="relative w-full h-auto block z-10 pointer-events-none" />
+                  <img src={image} alt="" className="absolute inset-0 w-full h-full object-cover z-0" />
                 </div>
                 <div className="p-2 text-center"><p className="text-xs font-bold text-white/70 truncate">{overlay.name}</p></div>
               </motion.button>

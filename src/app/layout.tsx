@@ -49,6 +49,10 @@ export default function RootLayout({
       <head>
         <meta name="mobile-web-app-capable" content="yes" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function(){function s(){document.documentElement.style.setProperty('--vh',window.innerHeight/100+'px')}
+          s();window.addEventListener('resize',s);window.addEventListener('orientationchange',function(){setTimeout(s,150)})})();
+        `}} />
       </head>
       <body className="min-h-dvh bg-party disco-lights overscroll-none">
         <div className="disco-light-extra" />

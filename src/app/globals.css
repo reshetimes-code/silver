@@ -41,12 +41,15 @@ body {
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: none;
+  -webkit-overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
+  min-height: 100vh;
   min-height: 100dvh;
   padding-top: var(--safe-top);
   padding-bottom: var(--safe-bottom);
   padding-left: var(--safe-left);
   padding-right: var(--safe-right);
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -225,13 +228,15 @@ body {
   border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.2);
+  -webkit-overflow-scrolling: touch;
 }
 
 .camera-viewfinder video {
   width: 100%;
   height: auto;
   display: block;
-  object-fit: cover;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
 }
 
 /* Viewfinder corners */
@@ -249,8 +254,25 @@ body {
 .viewfinder-corner.bl { bottom: 8px; left: 8px; border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
 .viewfinder-corner.br { bottom: 8px; right: 8px; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
 
+/* ===== CAMERA VIEWFINDER MAX HEIGHT ===== */
+.camera-viewfinder-main {
+  max-height: 62vh;
+  max-height: calc(var(--vh, 1vh) * 62);
+}
+
+/* ===== COUNTDOWN ===== */
+.countdown-number {
+  font-size: 6rem;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 0 30px rgba(233, 69, 96, 0.8), 0 0 60px rgba(233, 69, 96, 0.4);
+  line-height: 1;
+  -webkit-text-stroke: 0;
+}
+
 /* ===== SHUTTER BUTTON ===== */
 .shutter-btn {
+  position: relative;
   width: 72px;
   height: 72px;
   border-radius: 50%;
