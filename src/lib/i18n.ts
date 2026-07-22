@@ -47,6 +47,23 @@ export const translations = {
     deleteEvent: 'Delete Event',
     editEvent: 'Edit Event',
 
+    // Phone
+    enterPhone: 'Enter your phone number',
+    phoneNumber: 'Phone Number',
+    phonePlaceholder: '050-1234567',
+    phoneRequired: 'Phone number is required to continue',
+    continueBtn: 'Continue',
+
+    // Moderation
+    photoRejected: 'Photo could not be accepted',
+    noFaceDetected: 'No face detected in the photo. Please take a photo of yourself.',
+    inappropriateContent: 'This photo contains inappropriate content.',
+    photoUnderReview: 'Your photo is being reviewed and will be available shortly.',
+
+    // WhatsApp
+    sendToWhatsApp: 'Send to WhatsApp',
+    sharePhoto: 'Share Photo',
+
     // Common
     loading: 'Loading...',
     error: 'Something went wrong',
@@ -97,6 +114,23 @@ export const translations = {
     qrCode: 'קוד QR',
     deleteEvent: 'מחק אירוע',
     editEvent: 'ערוך אירוע',
+
+    // Phone
+    enterPhone: 'הזינו את מספר הטלפון שלכם',
+    phoneNumber: 'מספר טלפון',
+    phonePlaceholder: '050-1234567',
+    phoneRequired: 'נדרש מספר טלפון כדי להמשיך',
+    continueBtn: 'המשך',
+
+    // Moderation
+    photoRejected: 'התמונה לא התקבלה',
+    noFaceDetected: 'לא זוהו פנים בתמונה. אנא צלמו תמונה של עצמכם.',
+    inappropriateContent: 'התמונה מכילה תוכן לא הולם.',
+    photoUnderReview: 'התמונה שלכם נבדקת ותהיה זמינה בקרוב.',
+
+    // WhatsApp
+    sendToWhatsApp: 'שלח לוואטסאפ',
+    sharePhoto: 'שתף תמונה',
 
     // Common
     loading: 'טוען...',

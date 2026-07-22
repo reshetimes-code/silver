@@ -37,6 +37,10 @@ interface AppState {
   showLanguageToggle: boolean;
   setShowLanguageToggle: (show: boolean) => void;
 
+  // Guest phone number (persisted per device)
+  guestPhone: string;
+  setGuestPhone: (phone: string) => void;
+
   // Global overlays library
   overlays: Overlay[];
   addOverlay: (overlay: Overlay) => void;
@@ -68,6 +72,9 @@ export const useStore = create<AppState>()(
 
       showLanguageToggle: true,
       setShowLanguageToggle: (show) => set({ showLanguageToggle: show }),
+
+      guestPhone: '',
+      setGuestPhone: (phone) => set({ guestPhone: phone }),
 
       // Overlays
       overlays: [],

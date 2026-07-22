@@ -27,17 +27,22 @@ model Overlay {
 }
 
 model Photo {
-  id          String   @id @default(uuid())
-  eventId     String
-  overlayId   String?
-  photoUrl    String   @db.Text
-  deviceId    String
-  status      String   @default("pending")
-  createdAt   DateTime @default(now())
+  id               String   @id @default(uuid())
+  eventId          String
+  overlayId        String?
+  photoUrl         String   @db.Text
+  deviceId         String
+  phoneNumber      String   @default("")
+  status           String   @default("pending")
+  moderationStatus String   @default("approved")   // approved | rejected | pending_review
+  moderationReason String?
+  printStatus      String   @default("not_sent")    // not_sent | sent | printed
+  createdAt        DateTime @default(now())
 
-  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  overlay     Overlay? @relation(fields: [overlayId], references: [id])
+  event            Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  overlay          Overlay? @relation(fields: [overlayId], references: [id])
 
   @@index([eventId])
   @@index([deviceId])
+  @@index([phoneNumber])
 }

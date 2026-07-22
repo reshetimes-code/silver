@@ -29,15 +29,17 @@ export default function CapturePhotoPage() {
   const router = useRouter();
   const eventId = params.eventId as string;
   const hydrated = useHydrated();
-  const { locale, getDevicePrintCount } = useStore();
+  const { locale, getDevicePrintCount, guestPhone, setGuestPhone } = useStore();
 
   const [event, setEvent] = useState<EventData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [mode, setMode] = useState<'choose' | 'camera' | 'upload'>('choose');
+  const [mode, setMode] = useState<'phone' | 'choose' | 'camera' | 'upload'>('phone');
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [timerSeconds, setTimerSeconds] = useState<TimerValue>(0);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [phoneInput, setPhoneInput] = useState('');
+  const [phoneError, setPhoneError] = useState(false);
   const webcamRef = useRef<Webcam>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -52,11 +54,33 @@ export default function CapturePhotoPage() {
     });
   }, [eventId]);
 
+  // Skip phone step if already entered
+  useEffect(() => {
+    if (guestPhone && mode === 'phone') {
+      setPhoneInput(guestPhone);
+      setMode('choose');
+    }
+  }, [guestPhone, mode]);
+
   useEffect(() => {
     return () => {
       if (countdownRef.current) clearInterval(countdownRef.current);
     };
   }, []);
+
+  const validatePhone = (phone: string) => {
+    const cleaned = phone.replace(/[\s\-()]/g, '');
+    return /^0[0-9]{8,9}$/.test(cleaned) || /^\+?[0-9]{10,15}$/.test(cleaned);
+  };
+
+  const handlePhoneSubmit = () => {
+    if (!validatePhone(phoneInput)) {
+      setPhoneError(true);
+      return;
+    }
+    setGuestPhone(phoneInput);
+    setMode('choose');
+  };
 
   const captureNow = useCallback(() => {
     const imageSrc = webcamRef.current?.getScreenshot();
@@ -72,17 +96,13 @@ export default function CapturePhotoPage() {
   }, []);
 
   const capture = useCallback(() => {
-    // Prevent double-tap while timer is running
     if (countdownRef.current) return;
-
     if (timerSeconds === 0) {
       captureNow();
       return;
     }
-
     let remaining = timerSeconds;
     setCountdown(remaining);
-
     countdownRef.current = setInterval(() => {
       remaining -= 1;
       if (remaining <= 0) {
@@ -151,6 +171,48 @@ export default function CapturePhotoPage() {
     );
   }
 
+  // ===== PHONE ENTRY SCREEN =====
+  if (mode === 'phone') {
+    return (
+      <div className="min-h-dvh relative flex flex-col items-center justify-center px-5" dir={isRtl ? 'rtl' : 'ltr'}>
+        <ParticleBackground />
+        <LanguageToggle />
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-card p-8 w-full max-w-sm relative z-10 text-center"
+        >
+          <span className="text-5xl block mb-4">📱</span>
+          <h2 className="text-xl font-bold text-white mb-2">{t(locale, 'enterPhone')}</h2>
+          <p className="text-sm text-white/40 mb-6">{t(locale, 'phoneRequired')}</p>
+
+          <input
+            type="tel"
+            inputMode="tel"
+            value={phoneInput}
+            onChange={(e) => { setPhoneInput(e.target.value); setPhoneError(false); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') handlePhoneSubmit(); }}
+            placeholder={t(locale, 'phonePlaceholder')}
+            className={`w-full px-4 py-4 rounded-xl bg-white/8 border text-white text-center text-xl font-bold tracking-widest placeholder-white/25 focus:outline-none ${phoneError ? 'border-red-500' : 'border-white/15 focus:border-primary'}`}
+            dir="ltr"
+            autoComplete="tel"
+          />
+          {phoneError && (
+            <p className="text-red-400 text-xs mt-2">{he ? 'מספר טלפון לא תקין' : 'Invalid phone number'}</p>
+          )}
+
+          <motion.button
+            className="btn-glow w-full mt-6"
+            whileTap={{ scale: 0.96 }}
+            onClick={handlePhoneSubmit}
+          >
+            {t(locale, 'continueBtn')} ✨
+          </motion.button>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-dvh relative flex flex-col" dir={isRtl ? 'rtl' : 'ltr'}>
       <ParticleBackground />
@@ -214,7 +276,6 @@ export default function CapturePhotoPage() {
                 <div className="viewfinder-corner tl" /><div className="viewfinder-corner tr" />
                 <div className="viewfinder-corner bl" /><div className="viewfinder-corner br" />
 
-                {/* Countdown overlay */}
                 <AnimatePresence>
                   {countdown !== null && (
                     <motion.div

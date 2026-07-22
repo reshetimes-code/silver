@@ -44,8 +44,16 @@ export const api = {
     const res = await fetch(`${BASE}/api/photos?eventId=${eventId || 'all'}`);
     return res.json();
   },
-  async submitPhoto(data: { eventId: string; overlayId: string; image: string; deviceId: string }) {
+  async submitPhoto(data: { eventId: string; overlayId: string; image: string; deviceId: string; phoneNumber: string }) {
     const res = await fetch(`${BASE}/api/photos`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    if (!res.ok) {
+      const err = await res.json();
+      return { error: err.error, reason: err.reason };
+    }
+    return res.json();
+  },
+  async updatePhoto(id: string, data: Record<string, unknown>) {
+    const res = await fetch(`${BASE}/api/photos/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
     return res.json();
   },
   async deletePhoto(id: string) {
@@ -56,5 +64,20 @@ export const api = {
     for (const p of photos) {
       await fetch(`${BASE}/api/photos/${p.id}`, { method: 'DELETE' });
     }
+  },
+
+  // Print batch (Dropbox)
+  async sendToPrint(photoIds: string[]) {
+    const res = await fetch(`${BASE}/api/print-batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ photoIds }),
+    });
+    return res.json();
+  },
+
+  // Photo image URL (for sharing)
+  getPhotoImageUrl(photoId: string) {
+    return `${typeof window !== 'undefined' ? window.location.origin : ''}/api/photos/${photoId}/image`;
   },
 };

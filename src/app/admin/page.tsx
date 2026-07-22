@@ -17,7 +17,7 @@ type Tab = 'events' | 'overlays' | 'photos';
 
 interface EventData { id: string; name: string; date: string; maxPrintsPerDevice: number; active: boolean; }
 interface OverlayData { id: string; name: string; url: string; }
-interface PhotoData { id: string; eventId: string; photoUrl: string; overlayId: string | null; deviceId: string; createdAt: string; event?: EventData; overlay?: OverlayData; }
+interface PhotoData { id: string; eventId: string; photoUrl: string; overlayId: string | null; deviceId: string; phoneNumber: string; moderationStatus: string; moderationReason: string | null; printStatus: string; createdAt: string; event?: EventData; overlay?: OverlayData; }
 
 export default function AdminPage() {
   const hydrated = useHydrated();
@@ -331,13 +331,14 @@ function PhotosTab() {
   const [photoCounts, setPhotoCounts] = useState<Record<string, number>>({});
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [photos, setPhotos] = useState<PhotoData[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
+  const [sendingToPrint, setSendingToPrint] = useState(false);
 
   const loadEvents = async () => {
     const evs = await api.getEvents();
     setEvents(evs);
-    // Get photo count per event
     const counts: Record<string, number> = {};
     const allPhotos = await api.getPhotos();
     for (const p of allPhotos) {
@@ -352,9 +353,53 @@ function PhotosTab() {
   const openGallery = async (eventId: string) => {
     setSelectedEventId(eventId);
     setLoadingPhotos(true);
+    setSelectedIds(new Set());
     const p = await api.getPhotos(eventId);
     setPhotos(p);
     setLoadingPhotos(false);
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    if (selectedIds.size === photos.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(photos.map((p) => p.id)));
+    }
+  };
+
+  const handleSendToPrint = async () => {
+    if (selectedIds.size === 0) return;
+    const result = await Swal.fire({ icon: 'question', title: he ? `לשלוח ${selectedIds.size} תמונות להדפסה?` : `Send ${selectedIds.size} photos to print?`, text: he ? 'התמונות יישלחו לדרופבוקס' : 'Photos will be sent to Dropbox', showCancelButton: true, confirmButtonColor: '#e94560', cancelButtonColor: '#333', confirmButtonText: he ? 'שלח' : 'Send', cancelButtonText: he ? 'ביטול' : 'Cancel', background: '#1a1a2e', color: '#fff' });
+    if (!result.isConfirmed) return;
+    setSendingToPrint(true);
+    const res = await api.sendToPrint(Array.from(selectedIds));
+    setSendingToPrint(false);
+    if (res.sent > 0) {
+      setPhotos((prev) => prev.map((p) => selectedIds.has(p.id) ? { ...p, printStatus: 'sent' } : p));
+      setSelectedIds(new Set());
+      Swal.fire({ icon: 'success', title: he ? `${res.sent} תמונות נשלחו להדפסה!` : `${res.sent} photos sent to print!`, timer: 2000, showConfirmButton: false, background: '#1a1a2e', color: '#fff' });
+    }
+    if (res.failed > 0) {
+      Swal.fire({ icon: 'error', title: he ? `${res.failed} תמונות נכשלו` : `${res.failed} photos failed`, text: he ? 'בדוק הגדרות דרופבוקס' : 'Check Dropbox settings', background: '#1a1a2e', color: '#fff', confirmButtonColor: '#e94560' });
+    }
+  };
+
+  const handleApprovePhoto = async (photoId: string) => {
+    await api.updatePhoto(photoId, { moderationStatus: 'approved' });
+    setPhotos((prev) => prev.map((p) => p.id === photoId ? { ...p, moderationStatus: 'approved' } : p));
+  };
+
+  const handleRejectPhoto = async (photoId: string) => {
+    await api.updatePhoto(photoId, { moderationStatus: 'rejected' });
+    setPhotos((prev) => prev.filter((p) => p.id !== photoId));
   };
 
   const handleDeletePhoto = async (photoId: string) => {
@@ -362,10 +407,7 @@ function PhotosTab() {
     if (!result.isConfirmed) return;
     await api.deletePhoto(photoId);
     setPhotos((prev) => prev.filter((p) => p.id !== photoId));
-    setPhotoCounts((prev) => ({
-      ...prev,
-      [selectedEventId!]: (prev[selectedEventId!] || 1) - 1,
-    }));
+    setPhotoCounts((prev) => ({ ...prev, [selectedEventId!]: (prev[selectedEventId!] || 1) - 1 }));
   };
 
   const handleDeleteAllPhotos = async () => {
@@ -388,25 +430,18 @@ function PhotosTab() {
     }
   };
 
-  const handleShareGallery = () => {
-    if (!selectedEventId) return;
-    const url = `${window.location.origin}/admin`;
-    const event = events.find((e) => e.id === selectedEventId);
-    const text = `📸 ${event?.name || 'Event'} Gallery - ${photos.length} photos`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(text + '\n' + url)}`, '_blank');
-  };
-
   if (loading) return <div className="text-center py-10"><span className="text-3xl">⏳</span></div>;
 
-  // ===== GALLERY VIEW (inside an event) =====
+  // ===== GALLERY VIEW =====
   if (selectedEventId) {
     const event = events.find((e) => e.id === selectedEventId);
+    const pendingReview = photos.filter((p) => p.moderationStatus === 'pending_review');
+    const approvedPhotos = photos.filter((p) => p.moderationStatus === 'approved');
 
     if (loadingPhotos) return <div className="text-center py-10"><span className="text-3xl">⏳</span></div>;
 
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-        {/* Back + title */}
         <button className="text-sm text-white/50 mb-3 active:text-white" onClick={() => setSelectedEventId(null)}>
           ← {he ? 'חזרה לאירועים' : 'Back to events'}
         </button>
@@ -418,64 +453,117 @@ function PhotosTab() {
           </div>
         </div>
 
+        {/* Pending review section */}
+        {pendingReview.length > 0 && (
+          <div className="mb-6">
+            <h4 className="text-sm font-bold text-yellow-400 mb-2">⚠️ {he ? `${pendingReview.length} תמונות ממתינות לאישור` : `${pendingReview.length} photos pending review`}</h4>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {pendingReview.map((photo) => (
+                <div key={photo.id} className="glass-card overflow-hidden border border-yellow-500/30">
+                  <div className="relative bg-black">
+                    <img src={photo.photoUrl} alt="" className="w-full aspect-[3/4] object-cover" />
+                    <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded-full bg-yellow-500/80 text-[8px] font-bold text-black">
+                      {photo.moderationReason === 'suspicious_content' ? '🔍' : photo.moderationReason === 'low_face_confidence' ? '👤?' : '⚠️'}
+                    </div>
+                  </div>
+                  <div className="p-2">
+                    {photo.phoneNumber && <p className="text-[10px] text-white/40 mb-1">📱 {photo.phoneNumber}</p>}
+                    <div className="flex gap-1.5">
+                      <button className="flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-green-500/20 text-green-400 active:bg-green-500/30"
+                        onClick={() => handleApprovePhoto(photo.id)}>✓ {he ? 'אשר' : 'Approve'}</button>
+                      <button className="flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-red-500/20 text-red-400 active:bg-red-500/30"
+                        onClick={() => handleRejectPhoto(photo.id)}>✕ {he ? 'דחה' : 'Reject'}</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Action buttons */}
-        {photos.length > 0 && (
-          <div className="flex gap-2 mb-4">
-            <button className="btn-secondary flex-1 text-xs" onClick={handleDownloadAll}>
-              📥 {he ? 'הורד הכל' : 'Download All'}
-            </button>
-            <button className="flex-1 py-2 rounded-2xl text-xs font-bold bg-green-500/15 text-green-400 active:bg-green-500/25 border border-green-500/20"
-              onClick={handleShareGallery}>
-              📤 WhatsApp
-            </button>
-            <button className="flex-1 py-2 rounded-2xl text-xs font-bold bg-red-500/15 text-red-400 active:bg-red-500/25 border border-red-500/20"
-              onClick={handleDeleteAllPhotos}>
-              🗑️ {he ? 'מחק הכל' : 'Delete All'}
-            </button>
+        {approvedPhotos.length > 0 && (
+          <div className="space-y-2 mb-4">
+            <div className="flex gap-2">
+              <button className="flex-1 py-2 rounded-2xl text-xs font-bold bg-white/8 text-white/60 active:bg-white/15 border border-white/10"
+                onClick={selectAll}>
+                {selectedIds.size === photos.length ? (he ? 'בטל סימון' : 'Deselect All') : (he ? 'סמן הכל' : 'Select All')}
+              </button>
+              <button className="btn-secondary flex-1 text-xs" onClick={handleDownloadAll}>
+                📥 {he ? 'הורד הכל' : 'Download All'}
+              </button>
+              <button className="flex-1 py-2 rounded-2xl text-xs font-bold bg-red-500/15 text-red-400 active:bg-red-500/25 border border-red-500/20"
+                onClick={handleDeleteAllPhotos}>
+                🗑️ {he ? 'מחק הכל' : 'Delete All'}
+              </button>
+            </div>
+
+            {/* Send to Print button - appears when photos are selected */}
+            {selectedIds.size > 0 && (
+              <motion.button
+                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                className="w-full py-3 rounded-2xl text-sm font-bold active:scale-[0.98] transition-transform flex items-center justify-center gap-2 border border-purple-500/30"
+                style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(168,85,247,0.2))' }}
+                onClick={handleSendToPrint}
+                disabled={sendingToPrint}
+              >
+                {sendingToPrint ? '⏳' : '🖨️'} {he ? `שלח ${selectedIds.size} להדפסה` : `Send ${selectedIds.size} to Print`}
+              </motion.button>
+            )}
           </div>
         )}
 
         {/* Photo grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {photos.map((photo, i) => (
-            <motion.div key={photo.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}
-              className="glass-card overflow-hidden">
-              <div className="relative bg-black">
-                {photo.overlay ? (
-                  <div className="relative">
-                    <img src={photo.overlay.url} alt="" className="relative w-full h-auto block z-10 pointer-events-none" />
-                    <img src={photo.photoUrl} alt="" className="absolute inset-0 w-full h-full object-cover z-0" />
+          {approvedPhotos.map((photo, i) => {
+            const isSelected = selectedIds.has(photo.id);
+            return (
+              <motion.div key={photo.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}
+                className={`glass-card overflow-hidden transition-all ${isSelected ? 'ring-2 ring-primary' : ''}`}>
+                {/* Selectable photo */}
+                <div className="relative bg-black cursor-pointer" onClick={() => toggleSelect(photo.id)}>
+                  {photo.overlay ? (
+                    <div className="relative">
+                      <img src={photo.overlay.url} alt="" className="relative w-full h-auto block z-10 pointer-events-none" />
+                      <img src={photo.photoUrl} alt="" className="absolute inset-0 w-full h-full object-cover z-0" />
+                    </div>
+                  ) : (
+                    <img src={photo.photoUrl} alt="" className="w-full aspect-[3/4] object-cover" />
+                  )}
+                  {/* Selection checkbox */}
+                  <div className={`absolute top-2 right-2 w-6 h-6 rounded-full border-2 flex items-center justify-center z-20 ${isSelected ? 'bg-primary border-primary' : 'border-white/50 bg-black/30'}`}>
+                    {isSelected && <span className="text-white text-xs font-bold">✓</span>}
                   </div>
-                ) : (
-                  <img src={photo.photoUrl} alt="" className="w-full aspect-[3/4] object-cover" />
-                )}
-              </div>
-              <div className="p-2">
-                <p className="text-[10px] text-white/30 mb-2">{new Date(photo.createdAt).toLocaleTimeString()}</p>
-                <div className="flex gap-1.5">
-                  <button className="flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-white/8 text-white/60 active:bg-white/15"
-                    onClick={() => {
-                      const link = document.createElement('a');
-                      link.href = photo.photoUrl;
-                      link.download = `photo_${photo.id.slice(0, 8)}.jpg`;
-                      link.click();
-                    }}>
-                    📥
-                  </button>
-                  <button className="flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-green-500/15 text-green-400 active:bg-green-500/25"
-                    onClick={() => {
-                      window.open(`https://wa.me/?text=${encodeURIComponent('📸 Photo from ' + (event?.name || 'event'))}`, '_blank');
-                    }}>
-                    📤
-                  </button>
-                  <button className="flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-red-500/15 text-red-400 active:bg-red-500/25"
-                    onClick={() => handleDeletePhoto(photo.id)}>
-                    🗑️
-                  </button>
+                  {/* Print status badge */}
+                  {photo.printStatus === 'sent' && (
+                    <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded-full bg-purple-500/80 text-[8px] font-bold text-white z-20">🖨️</div>
+                  )}
                 </div>
-              </div>
-            </motion.div>
-          ))}
+                <div className="p-2">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-[10px] text-white/30">{new Date(photo.createdAt).toLocaleTimeString()}</p>
+                    {photo.phoneNumber && <p className="text-[10px] text-white/40">📱 {photo.phoneNumber}</p>}
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button className="flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-white/8 text-white/60 active:bg-white/15"
+                      onClick={() => {
+                        const link = document.createElement('a');
+                        link.href = photo.photoUrl;
+                        link.download = `photo_${photo.id.slice(0, 8)}.jpg`;
+                        link.click();
+                      }}>📥</button>
+                    <button className="flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-green-500/15 text-green-400 active:bg-green-500/25"
+                      onClick={() => {
+                        const photoUrl = `${window.location.origin}/api/photos/${photo.id}/image`;
+                        window.open(`https://wa.me/?text=${encodeURIComponent('📸 ' + (event?.name || '') + '\n' + photoUrl)}`, '_blank');
+                      }}>📤</button>
+                    <button className="flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-red-500/15 text-red-400 active:bg-red-500/25"
+                      onClick={() => handleDeletePhoto(photo.id)}>🗑️</button>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
 
         {photos.length === 0 && (
@@ -492,7 +580,6 @@ function PhotosTab() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <h3 className="text-sm font-bold text-white/50 mb-3">{he ? 'בחר אירוע לצפייה בגלריה' : 'Select event to view gallery'}</h3>
-
       <div className="space-y-3">
         {events.map((event, i) => {
           const count = photoCounts[event.id] || 0;
@@ -515,7 +602,6 @@ function PhotosTab() {
           );
         })}
       </div>
-
       {events.length === 0 && (
         <div className="glass-card p-10 text-center">
           <span className="text-5xl block mb-3">📸</span>
