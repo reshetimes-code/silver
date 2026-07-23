@@ -87,7 +87,7 @@ export default function AccessibilityWidget() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 100 }}
               transition={{ type: 'spring', damping: 20 }}
-              className="fixed bottom-0 left-0 right-0 z-50 bg-[#1a1a2e] border-t border-white/10 rounded-t-3xl p-5 pb-8 max-h-[80vh] overflow-y-auto"
+              className="fixed bottom-0 left-0 right-0 z-50 bg-[#0a0a0a] border-t border-[rgba(212,175,55,0.15)] rounded-t-3xl p-5 pb-8 max-h-[80vh] overflow-y-auto"
               style={{ paddingBottom: 'calc(32px + var(--safe-bottom, 0px))' }}
             >
               {/* Header */}

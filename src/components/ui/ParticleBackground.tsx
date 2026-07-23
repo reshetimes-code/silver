@@ -12,17 +12,22 @@ interface Particle {
   alpha: number;
   life: number;
   maxLife: number;
-  type: 'confetti' | 'sparkle' | 'bubble';
-  rotation: number;
-  rotationSpeed: number;
+  type: 'sparkle' | 'dust';
+  pulsePhase: number;
+  pulseSpeed: number;
 }
 
-const COLORS = [
-  '#e94560', '#FF3366', '#FF6B6B', // Reds
-  '#FFFFFF', '#F0F0F0', '#E8E8E8', // Whites
-  '#0f3460', '#1a5276', '#2196F3', // Blues
-  '#FFD700', '#FFA500', // Gold accents
+const GOLD_COLORS = [
+  '#D4AF37',
+  '#F4E5B0',
+  '#C5963A',
+  '#B8860B',
+  '#FFD700',
+  '#FFFFFF', // for sparkle highlights
 ];
+
+const CONNECTION_DISTANCE = 120;
+const CONNECTION_OPACITY = 0.06;
 
 export default function ParticleBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -44,96 +49,135 @@ export default function ParticleBackground() {
     window.addEventListener('resize', resize);
 
     function createParticle(): Particle {
-      const type = Math.random() < 0.4 ? 'confetti' : Math.random() < 0.7 ? 'sparkle' : 'bubble';
+      const type = Math.random() < 0.4 ? 'sparkle' : 'dust';
       return {
         x: Math.random() * canvas!.width,
-        y: -10 - Math.random() * 50,
-        vx: (Math.random() - 0.5) * 2,
-        vy: 0.5 + Math.random() * 2,
-        size: type === 'confetti' ? 4 + Math.random() * 6 : type === 'sparkle' ? 1 + Math.random() * 3 : 2 + Math.random() * 4,
-        color: COLORS[Math.floor(Math.random() * COLORS.length)],
-        alpha: 0.3 + Math.random() * 0.7,
+        y: canvas!.height + 10 + Math.random() * 30,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: -(0.15 + Math.random() * 0.4),
+        size: type === 'sparkle' ? 1.5 + Math.random() * 2.5 : 0.5 + Math.random() * 1.5,
+        color: type === 'sparkle'
+          ? GOLD_COLORS[Math.floor(Math.random() * GOLD_COLORS.length)]
+          : GOLD_COLORS[Math.floor(Math.random() * (GOLD_COLORS.length - 1))], // dust avoids pure white
+        alpha: type === 'sparkle' ? 0.4 + Math.random() * 0.5 : 0.2 + Math.random() * 0.3,
         life: 0,
-        maxLife: 200 + Math.random() * 300,
+        maxLife: 400 + Math.random() * 400,
         type,
-        rotation: Math.random() * 360,
-        rotationSpeed: (Math.random() - 0.5) * 4,
+        pulsePhase: Math.random() * Math.PI * 2,
+        pulseSpeed: 0.02 + Math.random() * 0.03,
       };
     }
 
-    // Initialize particles
-    for (let i = 0; i < 60; i++) {
+    // Initialize particles scattered across canvas
+    for (let i = 0; i < 40; i++) {
       const p = createParticle();
       p.y = Math.random() * canvas.height;
       p.life = Math.random() * p.maxLife;
       particlesRef.current.push(p);
     }
 
+    function drawConnections(particles: Particle[]) {
+      if (!ctx) return;
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < CONNECTION_DISTANCE) {
+            const opacity = (1 - dist / CONNECTION_DISTANCE) * CONNECTION_OPACITY;
+            ctx.strokeStyle = `rgba(212, 175, 55, ${opacity})`;
+            ctx.lineWidth = 0.5;
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.stroke();
+          }
+        }
+      }
+    }
+
     function animate() {
       if (!ctx || !canvas) return;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Add new particles
-      if (particlesRef.current.length < 80 && Math.random() < 0.3) {
+      // Add new particles gently
+      if (particlesRef.current.length < 45 && Math.random() < 0.1) {
         particlesRef.current.push(createParticle());
       }
+
+      // Draw constellation connections first (behind particles)
+      drawConnections(particlesRef.current);
 
       particlesRef.current = particlesRef.current.filter((p) => {
         p.life++;
         p.x += p.vx;
         p.y += p.vy;
-        p.rotation += p.rotationSpeed;
+        p.pulsePhase += p.pulseSpeed;
 
-        // Add wobble to confetti
-        if (p.type === 'confetti') {
-          p.vx += (Math.random() - 0.5) * 0.1;
-          p.vx *= 0.99;
+        // Gentle horizontal drift
+        p.vx += (Math.random() - 0.5) * 0.01;
+        p.vx *= 0.995;
+
+        // Fade in and fade out
+        let lifeFactor = 1;
+        if (p.life < 60) {
+          lifeFactor = p.life / 60; // fade in
+        } else if (p.life > p.maxLife * 0.8) {
+          lifeFactor = 1 - (p.life - p.maxLife * 0.8) / (p.maxLife * 0.2); // fade out
         }
 
-        const fadeOut = p.life > p.maxLife * 0.8
-          ? 1 - (p.life - p.maxLife * 0.8) / (p.maxLife * 0.2)
-          : 1;
+        // Pulse/twinkle effect for sparkles
+        const pulse = p.type === 'sparkle'
+          ? 0.6 + 0.4 * Math.sin(p.pulsePhase)
+          : 0.8 + 0.2 * Math.sin(p.pulsePhase);
+
+        const finalAlpha = p.alpha * lifeFactor * pulse;
 
         ctx!.save();
-        ctx!.globalAlpha = p.alpha * fadeOut;
-        ctx!.translate(p.x, p.y);
-        ctx!.rotate((p.rotation * Math.PI) / 180);
+        ctx!.globalAlpha = finalAlpha;
 
-        if (p.type === 'confetti') {
+        if (p.type === 'sparkle') {
+          // Draw a 4-point star sparkle
+          const s = p.size;
           ctx!.fillStyle = p.color;
-          ctx!.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
-        } else if (p.type === 'sparkle') {
-          ctx!.fillStyle = p.color;
-          ctx!.beginPath();
-          for (let i = 0; i < 4; i++) {
-            const angle = (i * Math.PI) / 2;
-            ctx!.moveTo(0, 0);
-            ctx!.lineTo(
-              Math.cos(angle) * p.size,
-              Math.sin(angle) * p.size
-            );
-          }
-          ctx!.stroke();
           ctx!.strokeStyle = p.color;
           ctx!.lineWidth = 0.5;
-          ctx!.stroke();
           ctx!.beginPath();
-          ctx!.arc(0, 0, p.size * 0.3, 0, Math.PI * 2);
+
+          // Vertical line
+          ctx!.moveTo(p.x, p.y - s * 1.2);
+          ctx!.lineTo(p.x, p.y + s * 1.2);
+          ctx!.moveTo(p.x - s * 1.2, p.y);
+          ctx!.lineTo(p.x + s * 1.2, p.y);
+
+          // Diagonal lines (shorter)
+          const d = s * 0.7;
+          ctx!.moveTo(p.x - d, p.y - d);
+          ctx!.lineTo(p.x + d, p.y + d);
+          ctx!.moveTo(p.x + d, p.y - d);
+          ctx!.lineTo(p.x - d, p.y + d);
+
+          ctx!.stroke();
+
+          // Center glow dot
+          ctx!.beginPath();
+          ctx!.arc(p.x, p.y, s * 0.35, 0, Math.PI * 2);
           ctx!.fill();
         } else {
-          ctx!.strokeStyle = p.color;
-          ctx!.lineWidth = 1;
+          // Dust: simple soft circle
+          const gradient = ctx!.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
+          gradient.addColorStop(0, p.color);
+          gradient.addColorStop(1, 'transparent');
+          ctx!.fillStyle = gradient;
           ctx!.beginPath();
-          ctx!.arc(0, 0, p.size, 0, Math.PI * 2);
-          ctx!.stroke();
-          ctx!.globalAlpha = p.alpha * fadeOut * 0.3;
-          ctx!.fillStyle = p.color;
+          ctx!.arc(p.x, p.y, p.size, 0, Math.PI * 2);
           ctx!.fill();
         }
 
         ctx!.restore();
 
-        return p.life < p.maxLife && p.y < canvas!.height + 20;
+        return p.life < p.maxLife && p.y > -20;
       });
 
       animationRef.current = requestAnimationFrame(animate);
@@ -151,7 +195,7 @@ export default function ParticleBackground() {
     <canvas
       ref={canvasRef}
       className="fixed inset-0 pointer-events-none z-0"
-      style={{ opacity: 0.6 }}
+      style={{ opacity: 0.4 }}
     />
   );
 }

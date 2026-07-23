@@ -31,78 +31,75 @@ export default function LandingPage() {
       <ParticleBackground />
       <LanguageToggle />
 
+      {/* Top gold accent line */}
+      <div className="h-[1px] gold-shimmer" />
+
       {/* Main content - centered */}
       <main className="flex-1 flex flex-col items-center justify-center px-5 py-8 relative z-10">
 
-        {/* Logo */}
+        {/* Logo with grand entrance */}
         <motion.div
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', damping: 14, delay: 0.1 }}
-          className="mb-5"
+          initial={{ scale: 0.8, opacity: 0, y: -30 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ type: 'spring', damping: 12, delay: 0.2 }}
+          className="mb-3"
         >
           <Logo size="lg" />
         </motion.div>
 
-        {/* Animated QR */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.5 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.6, type: 'spring' }}
-          className="relative mb-10"
+        {/* Tagline */}
+        <motion.p
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          className="text-xs uppercase tracking-[0.3em] mb-10"
+          style={{ color: 'rgba(212, 175, 55, 0.5)' }}
         >
-          <div className="w-32 h-32 sm:w-40 sm:h-40 glass-card flex items-center justify-center float-animation relative pulse-ring rounded-2xl">
-            <svg viewBox="0 0 100 100" className="w-20 h-20 sm:w-24 sm:h-24" fill="none">
-              <rect x="10" y="10" width="25" height="25" rx="3" fill="#e94560" />
-              <rect x="65" y="10" width="25" height="25" rx="3" fill="#e94560" />
-              <rect x="10" y="65" width="25" height="25" rx="3" fill="#e94560" />
-              <rect x="15" y="15" width="15" height="15" rx="2" fill="#0a0a1a" />
-              <rect x="70" y="15" width="15" height="15" rx="2" fill="#0a0a1a" />
-              <rect x="15" y="70" width="15" height="15" rx="2" fill="#0a0a1a" />
-              <rect x="19" y="19" width="7" height="7" rx="1" fill="#e94560" />
-              <rect x="74" y="19" width="7" height="7" rx="1" fill="#e94560" />
-              <rect x="19" y="74" width="7" height="7" rx="1" fill="#e94560" />
-              <rect x="40" y="10" width="5" height="5" fill="#0f3460" />
-              <rect x="50" y="10" width="5" height="5" fill="#0f3460" />
-              <rect x="40" y="40" width="5" height="5" fill="#0f3460" />
-              <rect x="55" y="40" width="5" height="5" fill="#0f3460" />
-              <rect x="65" y="45" width="5" height="5" fill="#0f3460" />
-              <rect x="50" y="65" width="5" height="5" fill="#0f3460" />
-              <rect x="75" y="75" width="5" height="5" fill="#0f3460" />
-              <rect x="65" y="85" width="5" height="5" fill="#0f3460" />
-            </svg>
-          </div>
-        </motion.div>
+          Capture &bull; Print &bull; Share
+        </motion.p>
+
+        {/* Decorative gold divider */}
+        <motion.div
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: 1 }}
+          transition={{ delay: 0.8, duration: 0.8 }}
+          className="w-32 h-[1px] mb-10"
+          style={{ background: 'linear-gradient(90deg, transparent, #D4AF37, transparent)' }}
+        />
 
         {/* Active Events */}
         {activeEvents.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8 }}
+            transition={{ delay: 0.9 }}
             className="w-full max-w-sm space-y-3"
           >
-            <h3 className="text-center text-white/40 text-xs uppercase tracking-[0.2em] mb-3">
+            <h3 className="text-center text-xs uppercase tracking-[0.25em] mb-4"
+              style={{ color: 'rgba(212, 175, 55, 0.4)' }}>
               {t(locale, 'events')}
             </h3>
             <AnimatePresence>
               {activeEvents.map((event, i) => (
                 <motion.div
                   key={event.id}
-                  initial={{ opacity: 0, x: isRtl ? 24 : -24 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.9 + i * 0.08 }}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 1.0 + i * 0.1 }}
                 >
                   <Link href={`/event/${event.id}`}>
-                    <div className="glass-card p-4 flex items-center justify-between active:scale-[0.98] transition-transform group">
+                    <div className="glass-card p-5 flex items-center justify-between active:scale-[0.98] transition-transform group">
                       <div className="min-w-0 flex-1">
-                        <h4 className="text-base font-bold text-white truncate group-active:text-primary transition-colors">
+                        <h4 className="text-base font-bold text-white truncate group-active:text-gold transition-colors">
                           {event.name}
                         </h4>
-                        <p className="text-xs text-white/40 mt-0.5">{event.date.replace(/-/g, '.')}</p>
+                        <p className="text-xs text-white/30 mt-1">{event.date.replace(/-/g, '.')}</p>
                       </div>
-                      <div className="flex-shrink-0 ml-3 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-lg">📸</span>
+                      <div className="flex-shrink-0 ml-3 w-11 h-11 rounded-full flex items-center justify-center"
+                        style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.15), rgba(212,175,55,0.05))', border: '1px solid rgba(212,175,55,0.2)' }}>
+                        <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#D4AF37" strokeWidth="1.5">
+                          <path d="M9 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
                       </div>
                     </div>
                   </Link>
@@ -112,12 +109,24 @@ export default function LandingPage() {
           </motion.div>
         )}
 
+        {/* No events state */}
+        {activeEvents.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.0 }}
+            className="text-center"
+          >
+            <p className="text-white/30 text-sm">{isRtl ? 'אין אירועים פעילים' : 'No active events'}</p>
+          </motion.div>
+        )}
+
         {/* Admin Link */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 1.2 }}
-          className="mt-10"
+          transition={{ delay: 1.4 }}
+          className="mt-12"
         >
           <Link href="/admin">
             <button className="btn-secondary text-sm">
@@ -127,8 +136,8 @@ export default function LandingPage() {
         </motion.div>
       </main>
 
-      {/* Bottom accent line */}
-      <div className="h-0.5 bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+      {/* Bottom gold accent */}
+      <div className="h-[1px]" style={{ background: 'linear-gradient(90deg, transparent, rgba(212,175,55,0.3), transparent)' }} />
     </div>
   );
 }

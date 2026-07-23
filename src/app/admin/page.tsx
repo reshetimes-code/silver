@@ -37,7 +37,7 @@ export default function AdminPage() {
         <Link href="/"><Logo size="sm" /></Link>
         <h1 className="text-sm font-bold text-white/80">{t(locale, 'admin')}</h1>
       </div>
-      <div className="sticky top-[53px] z-30 bg-[#0a0a1a]/90 backdrop-blur-lg border-b border-white/5">
+      <div className="sticky top-[53px] z-30 bg-black/90 backdrop-blur-lg border-b border-[rgba(212,175,55,0.1)]">
         <div className="flex max-w-3xl mx-auto">
           {([
             { id: 'events' as Tab, label: he ? 'אירועים' : 'Events', icon: '🎉' },
@@ -94,7 +94,7 @@ function EventsTab() {
     const errs = { name: !name.trim(), date: !date };
     setErrors(errs);
     if (errs.name || errs.date) {
-      Swal.fire({ icon: 'warning', title: he ? 'שדות חסרים' : 'Missing Fields', text: he ? 'נא למלא שם אירוע ותאריך' : 'Please fill in event name and date', background: '#1a1a2e', color: '#fff', confirmButtonColor: '#e94560' });
+      Swal.fire({ icon: 'warning', title: he ? 'שדות חסרים' : 'Missing Fields', text: he ? 'נא למלא שם אירוע ותאריך' : 'Please fill in event name and date', background: '#0a0a0a', color: '#fff', confirmButtonColor: '#D4AF37' });
       return;
     }
 
@@ -105,7 +105,7 @@ function EventsTab() {
     }
     resetForm();
     loadEvents();
-    Swal.fire({ icon: 'success', title: he ? 'נשמר!' : 'Saved!', timer: 1500, showConfirmButton: false, background: '#1a1a2e', color: '#fff' });
+    Swal.fire({ icon: 'success', title: he ? 'נשמר!' : 'Saved!', timer: 1500, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
   };
 
   const startEdit = (id: string) => {
@@ -116,11 +116,11 @@ function EventsTab() {
   };
 
   const handleDelete = async (id: string) => {
-    const result = await Swal.fire({ icon: 'warning', title: he ? 'למחוק אירוע?' : 'Delete event?', text: he ? 'כל התמונות של האירוע יימחקו' : 'All photos for this event will be deleted', showCancelButton: true, confirmButtonColor: '#e94560', cancelButtonColor: '#333', confirmButtonText: he ? 'מחק' : 'Delete', cancelButtonText: he ? 'ביטול' : 'Cancel', background: '#1a1a2e', color: '#fff' });
+    const result = await Swal.fire({ icon: 'warning', title: he ? 'למחוק אירוע?' : 'Delete event?', text: he ? 'כל התמונות של האירוע יימחקו' : 'All photos for this event will be deleted', showCancelButton: true, confirmButtonColor: '#D4AF37', cancelButtonColor: '#333', confirmButtonText: he ? 'מחק' : 'Delete', cancelButtonText: he ? 'ביטול' : 'Cancel', background: '#0a0a0a', color: '#fff' });
     if (!result.isConfirmed) return;
     await api.deleteEvent(id);
     loadEvents();
-    Swal.fire({ icon: 'success', title: he ? 'נמחק!' : 'Deleted!', timer: 1500, showConfirmButton: false, background: '#1a1a2e', color: '#fff' });
+    Swal.fire({ icon: 'success', title: he ? 'נמחק!' : 'Deleted!', timer: 1500, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
   };
 
   const handleToggle = async (id: string, active: boolean) => {
@@ -277,7 +277,7 @@ function OverlaysTab() {
   };
 
   const handleDeleteOverlay = async (id: string) => {
-    const result = await Swal.fire({ icon: 'warning', title: he ? 'למחוק מסגרת?' : 'Delete overlay?', showCancelButton: true, confirmButtonColor: '#e94560', cancelButtonColor: '#333', confirmButtonText: he ? 'מחק' : 'Delete', cancelButtonText: he ? 'ביטול' : 'Cancel', background: '#1a1a2e', color: '#fff' });
+    const result = await Swal.fire({ icon: 'warning', title: he ? 'למחוק מסגרת?' : 'Delete overlay?', showCancelButton: true, confirmButtonColor: '#D4AF37', cancelButtonColor: '#333', confirmButtonText: he ? 'מחק' : 'Delete', cancelButtonText: he ? 'ביטול' : 'Cancel', background: '#0a0a0a', color: '#fff' });
     if (!result.isConfirmed) return;
     await api.deleteOverlay(id);
     loadOverlays();
@@ -298,7 +298,7 @@ function OverlaysTab() {
             className="glass-card overflow-hidden relative">
             <div className="aspect-[3/4] relative">
               <div className="absolute inset-0" style={{
-                backgroundImage: 'repeating-conic-gradient(#1a1a2e 0% 25%, #252540 0% 50%)',
+                backgroundImage: 'repeating-conic-gradient(#0a0a0a 0% 25%, #1a1a1a 0% 50%)',
                 backgroundSize: '12px 12px',
               }} />
               <img src={overlay.url} alt={overlay.name} className="relative w-full h-full object-contain p-1" />
@@ -377,7 +377,7 @@ function PhotosTab() {
 
   const handleSendToPrint = async () => {
     if (selectedIds.size === 0) return;
-    const result = await Swal.fire({ icon: 'question', title: he ? `לשלוח ${selectedIds.size} תמונות להדפסה?` : `Send ${selectedIds.size} photos to print?`, text: he ? 'התמונות יישלחו לדרופבוקס' : 'Photos will be sent to Dropbox', showCancelButton: true, confirmButtonColor: '#e94560', cancelButtonColor: '#333', confirmButtonText: he ? 'שלח' : 'Send', cancelButtonText: he ? 'ביטול' : 'Cancel', background: '#1a1a2e', color: '#fff' });
+    const result = await Swal.fire({ icon: 'question', title: he ? `לשלוח ${selectedIds.size} תמונות להדפסה?` : `Send ${selectedIds.size} photos to print?`, text: he ? 'התמונות יישלחו לדרופבוקס' : 'Photos will be sent to Dropbox', showCancelButton: true, confirmButtonColor: '#D4AF37', cancelButtonColor: '#333', confirmButtonText: he ? 'שלח' : 'Send', cancelButtonText: he ? 'ביטול' : 'Cancel', background: '#0a0a0a', color: '#fff' });
     if (!result.isConfirmed) return;
     setSendingToPrint(true);
     const res = await api.sendToPrint(Array.from(selectedIds));
@@ -385,10 +385,10 @@ function PhotosTab() {
     if (res.sent > 0) {
       setPhotos((prev) => prev.map((p) => selectedIds.has(p.id) ? { ...p, printStatus: 'sent' } : p));
       setSelectedIds(new Set());
-      Swal.fire({ icon: 'success', title: he ? `${res.sent} תמונות נשלחו להדפסה!` : `${res.sent} photos sent to print!`, timer: 2000, showConfirmButton: false, background: '#1a1a2e', color: '#fff' });
+      Swal.fire({ icon: 'success', title: he ? `${res.sent} תמונות נשלחו להדפסה!` : `${res.sent} photos sent to print!`, timer: 2000, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
     }
     if (res.failed > 0) {
-      Swal.fire({ icon: 'error', title: he ? `${res.failed} תמונות נכשלו` : `${res.failed} photos failed`, text: he ? 'בדוק הגדרות דרופבוקס' : 'Check Dropbox settings', background: '#1a1a2e', color: '#fff', confirmButtonColor: '#e94560' });
+      Swal.fire({ icon: 'error', title: he ? `${res.failed} תמונות נכשלו` : `${res.failed} photos failed`, text: he ? 'בדוק הגדרות דרופבוקס' : 'Check Dropbox settings', background: '#0a0a0a', color: '#fff', confirmButtonColor: '#D4AF37' });
     }
   };
 
@@ -403,7 +403,7 @@ function PhotosTab() {
   };
 
   const handleDeletePhoto = async (photoId: string) => {
-    const result = await Swal.fire({ icon: 'warning', title: he ? 'למחוק תמונה?' : 'Delete photo?', showCancelButton: true, confirmButtonColor: '#e94560', cancelButtonColor: '#333', confirmButtonText: he ? 'מחק' : 'Delete', cancelButtonText: he ? 'ביטול' : 'Cancel', background: '#1a1a2e', color: '#fff' });
+    const result = await Swal.fire({ icon: 'warning', title: he ? 'למחוק תמונה?' : 'Delete photo?', showCancelButton: true, confirmButtonColor: '#D4AF37', cancelButtonColor: '#333', confirmButtonText: he ? 'מחק' : 'Delete', cancelButtonText: he ? 'ביטול' : 'Cancel', background: '#0a0a0a', color: '#fff' });
     if (!result.isConfirmed) return;
     await api.deletePhoto(photoId);
     setPhotos((prev) => prev.filter((p) => p.id !== photoId));
@@ -412,12 +412,12 @@ function PhotosTab() {
 
   const handleDeleteAllPhotos = async () => {
     if (!selectedEventId) return;
-    const result = await Swal.fire({ icon: 'error', title: he ? 'למחוק את כל התמונות?' : 'Delete ALL photos?', text: he ? 'פעולה זו לא ניתנת לביטול!' : 'This action cannot be undone!', showCancelButton: true, confirmButtonColor: '#e94560', cancelButtonColor: '#333', confirmButtonText: he ? 'מחק הכל' : 'Delete All', cancelButtonText: he ? 'ביטול' : 'Cancel', background: '#1a1a2e', color: '#fff' });
+    const result = await Swal.fire({ icon: 'error', title: he ? 'למחוק את כל התמונות?' : 'Delete ALL photos?', text: he ? 'פעולה זו לא ניתנת לביטול!' : 'This action cannot be undone!', showCancelButton: true, confirmButtonColor: '#D4AF37', cancelButtonColor: '#333', confirmButtonText: he ? 'מחק הכל' : 'Delete All', cancelButtonText: he ? 'ביטול' : 'Cancel', background: '#0a0a0a', color: '#fff' });
     if (!result.isConfirmed) return;
     await api.deleteEventPhotos(selectedEventId);
     setPhotos([]);
     setPhotoCounts((prev) => ({ ...prev, [selectedEventId]: 0 }));
-    Swal.fire({ icon: 'success', title: he ? 'כל התמונות נמחקו' : 'All photos deleted', timer: 1500, showConfirmButton: false, background: '#1a1a2e', color: '#fff' });
+    Swal.fire({ icon: 'success', title: he ? 'כל התמונות נמחקו' : 'All photos deleted', timer: 1500, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
   };
 
   const handleDownloadAll = async () => {
@@ -620,7 +620,7 @@ function QRCodeDisplay({ eventId }: { eventId: string }) {
       try {
         const QRCode = (await import('qrcode')).default;
         const url = `${window.location.origin}/event/${eventId}`;
-        const svg = await QRCode.toString(url, { type: 'svg', color: { dark: '#1a1a2e', light: '#ffffff' }, margin: 2, width: 200 });
+        const svg = await QRCode.toString(url, { type: 'svg', color: { dark: '#0a0a0a', light: '#ffffff' }, margin: 2, width: 200 });
         setQrSvg(svg);
       } catch (err) { console.error('QR failed:', err); }
     })();

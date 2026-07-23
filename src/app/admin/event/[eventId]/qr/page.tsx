@@ -35,7 +35,7 @@ export default function QRDisplayPage() {
         const url = `${window.location.origin}/event/${eventId}`;
         const dataUrl = await QRCode.toDataURL(url, {
           width: 400, margin: 2,
-          color: { dark: '#1a1a2e', light: '#ffffff' },
+          color: { dark: '#000000', light: '#ffffff' },
         });
         setQrDataUrl(dataUrl);
       } catch (err) {

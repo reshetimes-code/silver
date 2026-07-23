@@ -27,7 +27,7 @@ export default function AdminAuth({ children }: { children: React.ReactNode }) {
       setError(false);
     } else {
       setError(true);
-      Swal.fire({ icon: 'error', title: 'Wrong Password', text: 'Please try again', background: '#1a1a2e', color: '#fff', confirmButtonColor: '#e94560' });
+      Swal.fire({ icon: 'error', title: 'Wrong Password', text: 'Please try again', background: '#0a0a0a', color: '#fff', confirmButtonColor: '#D4AF37' });
     }
   };
 
@@ -54,8 +54,8 @@ export default function AdminAuth({ children }: { children: React.ReactNode }) {
           onChange={(e) => { setPassword(e.target.value); setError(false); }}
           onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
           placeholder="Password"
-          className={`w-full px-4 py-3 rounded-xl bg-white/8 border text-white text-center text-lg tracking-widest placeholder-white/25 focus:outline-none mb-4 ${
-            error ? 'border-red-500' : 'border-white/15 focus:border-primary'
+          className={`w-full px-4 py-3 rounded-xl bg-white/5 border text-white text-center text-lg tracking-widest placeholder-white/20 focus:outline-none mb-4 ${
+            error ? 'border-red-500' : 'border-white/10 focus:border-[#D4AF37]'
           }`}
           autoFocus
         />

@@ -193,7 +193,7 @@ export default function CapturePhotoPage() {
             onChange={(e) => { setPhoneInput(e.target.value); setPhoneError(false); }}
             onKeyDown={(e) => { if (e.key === 'Enter') handlePhoneSubmit(); }}
             placeholder={t(locale, 'phonePlaceholder')}
-            className={`w-full px-4 py-4 rounded-xl bg-white/8 border text-white text-center text-xl font-bold tracking-widest placeholder-white/25 focus:outline-none ${phoneError ? 'border-red-500' : 'border-white/15 focus:border-primary'}`}
+            className={`w-full px-4 py-4 rounded-xl bg-white/5 border text-white text-center text-xl font-bold tracking-widest placeholder-white/20 focus:outline-none ${phoneError ? 'border-red-500' : 'border-white/10 focus:border-[#D4AF37]'}`}
             dir="ltr"
             autoComplete="tel"
           />
@@ -221,7 +221,8 @@ export default function CapturePhotoPage() {
       <div className="app-header flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0"><Logo size="sm" /></div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <div className="px-2.5 py-1 rounded-full bg-primary/15 text-primary text-xs font-bold">
+          <div className="px-2.5 py-1 rounded-full text-xs font-bold"
+            style={{ background: 'rgba(212,175,55,0.15)', color: '#D4AF37', border: '1px solid rgba(212,175,55,0.2)' }}>
             {printsRemaining} {t(locale, 'remainingPrints')}
           </div>
         </div>

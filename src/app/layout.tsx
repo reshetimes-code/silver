@@ -19,12 +19,12 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#0a0a1a",
+  themeColor: "#000000",
 };
 
 export const metadata: Metadata = {
-  title: "PHOTOBOOTH",
-  description: "Professional photo booth experience with custom overlays and instant printing",
+  title: "PHOTOBOOTH | Capture. Print. Share.",
+  description: "Premium photo booth experience with custom overlays and instant printing",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -48,14 +48,13 @@ export default function RootLayout({
     >
       <head>
         <meta name="mobile-web-app-capable" content="yes" />
-        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <link rel="apple-touch-icon" href="/logo.png" />
         <script dangerouslySetInnerHTML={{ __html: `
           (function(){function s(){document.documentElement.style.setProperty('--vh',window.innerHeight/100+'px')}
           s();window.addEventListener('resize',s);window.addEventListener('orientationchange',function(){setTimeout(s,150)})})();
         `}} />
       </head>
-      <body className="min-h-dvh bg-party disco-lights overscroll-none">
-        <div className="disco-light-extra" />
+      <body className="min-h-dvh bg-party overscroll-none">
         {children}
         <AccessibilityWidget />
       </body>
