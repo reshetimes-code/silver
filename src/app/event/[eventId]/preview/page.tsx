@@ -140,8 +140,8 @@ export default function PreviewPage() {
               <path className="checkmark-path" d="M10 25 L20 35 L40 15" fill="none" stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </motion.div>
-          <motion.h2 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="text-2xl font-bold text-white mb-3">{t(locale, 'printSent')}</motion.h2>
-          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }} className="text-sm text-white/50 mb-6">{t(locale, 'printMessage')}</motion.p>
+          <motion.h2 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="text-3xl font-bold text-white mb-3">{t(locale, 'printSent')}</motion.h2>
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }} className="text-base text-white/50 mb-6">{t(locale, 'printMessage')}</motion.p>
           {[...Array(16)].map((_, i) => (
             <motion.div key={i} className="absolute w-2.5 h-2.5 rounded-full"
               style={{ background: ['#e94560', '#0f3460', '#FFD700', '#00E676', '#FF6B6B', '#2196F3'][i % 6], left: '50%', top: '35%' }}
@@ -154,7 +154,7 @@ export default function PreviewPage() {
           {guestPhone && submittedPhotoId && (
             <motion.button
               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}
-              className="w-full py-3 rounded-2xl text-base font-bold border border-green-500/30 mb-3 active:scale-95 transition-transform flex items-center justify-center gap-2"
+              className="w-full py-4 rounded-2xl text-lg font-bold border border-green-500/30 mb-3 active:scale-95 transition-transform flex items-center justify-center gap-2"
               style={{ background: 'rgba(37, 211, 102, 0.15)', color: '#25D366' }}
               onClick={handleSendWhatsApp}
             >
@@ -178,7 +178,7 @@ export default function PreviewPage() {
       <div className="min-h-dvh relative flex flex-col" dir={isRtl ? 'rtl' : 'ltr'}>
         <ParticleBackground /><LanguageToggle />
         <div className="app-header flex items-center justify-center">
-          <h2 className="text-base font-bold text-white/80">{he ? 'בחר מסגרת' : 'Choose a Frame'} 🖼️</h2>
+          <h2 className="text-lg font-bold text-white/80">{he ? 'בחר מסגרת' : 'Choose a Frame'} 🖼️</h2>
         </div>
         <main className="flex-1 px-4 py-4 relative z-10 overflow-y-auto">
           <div className="w-20 h-20 mx-auto mb-4 rounded-xl overflow-hidden border-2 border-primary/30">
@@ -220,7 +220,7 @@ export default function PreviewPage() {
     <div className="min-h-dvh relative flex flex-col" dir={isRtl ? 'rtl' : 'ltr'}>
       <ParticleBackground /><LanguageToggle />
       <div className="app-header flex items-center justify-center">
-        <h2 className="text-base font-bold text-white/80">{t(locale, 'preview')} ✨</h2>
+        <h2 className="text-lg font-bold text-white/80">{t(locale, 'preview')} ✨</h2>
       </div>
       <main className="flex-1 flex flex-col items-center justify-center px-5 py-4 relative z-10 overflow-y-auto">
         <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5, type: 'spring' }} className="w-full max-w-sm">
@@ -247,7 +247,7 @@ export default function PreviewPage() {
       <div className="bottom-bar">
         <div className="flex items-center gap-3 max-w-sm mx-auto">
           <button className="btn-secondary flex-1" onClick={() => setSelectedOverlayId(null)}>{he ? 'החלף מסגרת' : 'Change Frame'}</button>
-          <motion.button className="btn-glow flex-[1.5] text-base" whileTap={{ scale: 0.96 }} onClick={handlePrint} disabled={printing}>
+          <motion.button className="btn-glow flex-[1.5] text-lg" whileTap={{ scale: 0.96 }} onClick={handlePrint} disabled={printing}>
             {printing ? <motion.span animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} className="inline-block">⏳</motion.span>
               : <>🖨️ {t(locale, 'print')}</>}
           </motion.button>

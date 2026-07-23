@@ -4,9 +4,9 @@ import { motion } from 'framer-motion';
 
 export default function Logo({ size = 'lg' }: { size?: 'sm' | 'md' | 'lg' }) {
   const imgClass = {
-    sm: 'h-8',
-    md: 'h-14',
-    lg: 'h-20 sm:h-24',
+    sm: 'h-10',
+    md: 'h-16',
+    lg: 'h-24 sm:h-32',
   }[size];
 
   return (

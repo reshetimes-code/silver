@@ -75,7 +75,7 @@ export default function LandingPage() {
             transition={{ delay: 0.9 }}
             className="w-full max-w-sm space-y-3"
           >
-            <h3 className="text-center text-xs uppercase tracking-[0.25em] mb-4"
+            <h3 className="text-center text-sm uppercase tracking-[0.25em] mb-4"
               style={{ color: 'rgba(212, 175, 55, 0.4)' }}>
               {t(locale, 'events')}
             </h3>
@@ -90,10 +90,10 @@ export default function LandingPage() {
                   <Link href={`/event/${event.id}`}>
                     <div className="glass-card p-5 flex items-center justify-between active:scale-[0.98] transition-transform group">
                       <div className="min-w-0 flex-1">
-                        <h4 className="text-base font-bold text-white truncate group-active:text-gold transition-colors">
+                        <h4 className="text-lg font-bold text-white truncate group-active:text-gold transition-colors">
                           {event.name}
                         </h4>
-                        <p className="text-xs text-white/30 mt-1">{event.date.replace(/-/g, '.')}</p>
+                        <p className="text-sm text-white/30 mt-1">{event.date.replace(/-/g, '.')}</p>
                       </div>
                       <div className="flex-shrink-0 ml-3 w-11 h-11 rounded-full flex items-center justify-center"
                         style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.15), rgba(212,175,55,0.05))', border: '1px solid rgba(212,175,55,0.2)' }}>

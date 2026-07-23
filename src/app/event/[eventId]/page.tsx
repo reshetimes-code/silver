@@ -182,9 +182,9 @@ export default function CapturePhotoPage() {
           animate={{ opacity: 1, y: 0 }}
           className="glass-card p-8 w-full max-w-sm relative z-10 text-center"
         >
-          <span className="text-5xl block mb-4">📱</span>
-          <h2 className="text-xl font-bold text-white mb-2">{t(locale, 'enterPhone')}</h2>
-          <p className="text-sm text-white/40 mb-6">{t(locale, 'phoneRequired')}</p>
+          <span className="text-6xl block mb-5">📱</span>
+          <h2 className="text-2xl font-bold text-white mb-3">{t(locale, 'enterPhone')}</h2>
+          <p className="text-base text-white/40 mb-6">{t(locale, 'phoneRequired')}</p>
 
           <input
             type="tel"
@@ -193,7 +193,7 @@ export default function CapturePhotoPage() {
             onChange={(e) => { setPhoneInput(e.target.value); setPhoneError(false); }}
             onKeyDown={(e) => { if (e.key === 'Enter') handlePhoneSubmit(); }}
             placeholder={t(locale, 'phonePlaceholder')}
-            className={`w-full px-4 py-4 rounded-xl bg-white/5 border text-white text-center text-xl font-bold tracking-widest placeholder-white/20 focus:outline-none ${phoneError ? 'border-red-500' : 'border-white/10 focus:border-[#D4AF37]'}`}
+            className={`w-full px-4 py-5 rounded-xl bg-white/5 border text-white text-center text-2xl font-bold tracking-widest placeholder-white/20 focus:outline-none ${phoneError ? 'border-red-500' : 'border-white/10 focus:border-[#D4AF37]'}`}
             dir="ltr"
             autoComplete="tel"
           />
@@ -229,8 +229,8 @@ export default function CapturePhotoPage() {
       </div>
 
       <div className="px-5 py-2 relative z-10 text-center">
-        <h2 className="text-lg font-bold text-white">{event.name}</h2>
-        <p className="text-sm text-white/50 mt-0.5">{event.date.replace(/-/g, '.')}</p>
+        <h2 className="text-xl font-bold text-white">{event.name}</h2>
+        <p className="text-base text-white/40 mt-0.5">{event.date.replace(/-/g, '.')}</p>
       </div>
 
       <main className="flex-1 flex flex-col items-center justify-center px-3 pb-6 relative z-10">
@@ -242,12 +242,12 @@ export default function CapturePhotoPage() {
                 animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 2, repeat: Infinity }}>
                 <span className="text-5xl">📷</span>
               </motion.div>
-              <motion.button className="btn-glow w-full text-base" whileTap={{ scale: 0.96 }} onClick={() => setMode('camera')}>
-                <span className="text-xl">📸</span> {t(locale, 'takePhoto')}
+              <motion.button className="btn-glow w-full text-lg" whileTap={{ scale: 0.96 }} onClick={() => setMode('camera')}>
+                <span className="text-2xl">📸</span> {t(locale, 'takePhoto')}
               </motion.button>
-              <motion.button className="btn-secondary w-full text-base" whileTap={{ scale: 0.96 }}
+              <motion.button className="btn-secondary w-full text-lg" whileTap={{ scale: 0.96 }}
                 onClick={() => fileInputRef.current?.click()}>
-                <span className="text-xl">🖼️</span> {t(locale, 'uploadPhoto')}
+                <span className="text-2xl">🖼️</span> {t(locale, 'uploadPhoto')}
               </motion.button>
               <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
             </motion.div>
