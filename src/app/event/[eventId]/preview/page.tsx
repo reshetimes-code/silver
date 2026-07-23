@@ -10,6 +10,7 @@ import { getDeviceId } from '@/lib/device-id';
 import { api } from '@/lib/api';
 import OverlayRenderer from '@/components/overlays/OverlayRenderer';
 import LanguageToggle from '@/components/ui/LanguageToggle';
+import Footer from '@/components/ui/Footer';
 import ParticleBackground from '@/components/ui/ParticleBackground';
 
 function seededRandom(seed: number): number {
@@ -82,7 +83,6 @@ export default function PreviewPage() {
       return;
     }
 
-    // Photo accepted (approved or pending_review)
     setSubmittedPhotoId(result.id);
     incrementDevicePrints(eventId, deviceId);
     setPrintSuccess(true);
@@ -98,7 +98,6 @@ export default function PreviewPage() {
       ? `📸 התמונה שלי מהאירוע ${eventName}\n${photoUrl}`
       : `📸 My photo from ${eventName}\n${photoUrl}`;
 
-    // Format phone for WhatsApp (remove leading 0, add Israel code if needed)
     let waPhone = guestPhone.replace(/[\s\-()]/g, '');
     if (waPhone.startsWith('0')) {
       waPhone = '972' + waPhone.slice(1);
@@ -110,7 +109,19 @@ export default function PreviewPage() {
   if (!hydrated || loading) {
     return (
       <div className="min-h-dvh flex items-center justify-center">
-        <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} className="text-4xl">⏳</motion.div>
+        <motion.div
+          className="flex flex-col items-center gap-3"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+            className="w-10 h-10 rounded-full border-2 border-transparent"
+            style={{ borderTopColor: '#D4AF37', borderRightColor: '#D4AF37' }}
+          />
+          <span className="text-xs text-white/30 tracking-widest uppercase">{he ? 'טוען...' : 'Loading...'}</span>
+        </motion.div>
       </div>
     );
   }
@@ -118,39 +129,50 @@ export default function PreviewPage() {
   if (!event || !image) {
     return (
       <div className="min-h-dvh flex items-center justify-center px-5">
-        <div className="glass-card p-8 text-center">
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="glass-card p-8 text-center"
+        >
           <span className="text-5xl block mb-3">😕</span>
           <h2 className="text-xl font-bold text-white mb-3">{t(locale, 'error')}</h2>
           <button className="btn-secondary" onClick={() => router.push(`/event/${eventId}`)}>{t(locale, 'back')}</button>
-        </div>
+        </motion.div>
       </div>
     );
   }
 
-  // ===== SUCCESS SCREEN (with WhatsApp share) =====
+  // ===== SUCCESS SCREEN =====
   if (printSuccess) {
     return (
       <div className="min-h-dvh relative flex flex-col items-center justify-center px-5" dir={isRtl ? 'rtl' : 'ltr'}>
         <ParticleBackground /><LanguageToggle />
         <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', damping: 14 }}
           className="glass-card p-8 text-center w-full max-w-sm relative z-10 overflow-hidden">
+
+          {/* Success checkmark */}
           <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2, type: 'spring' }}
             className="w-20 h-20 mx-auto mb-5 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #00C851, #00E676)' }}>
             <svg className="w-12 h-12" viewBox="0 0 50 50">
               <path className="checkmark-path" d="M10 25 L20 35 L40 15" fill="none" stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </motion.div>
-          <motion.h2 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="text-3xl font-bold text-white mb-3">{t(locale, 'printSent')}</motion.h2>
-          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }} className="text-base text-white/50 mb-6">{t(locale, 'printMessage')}</motion.p>
+
+          <motion.h2 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
+            className="text-3xl font-bold text-white mb-3">{t(locale, 'printSent')}</motion.h2>
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}
+            className="text-base text-white/50 mb-6">{t(locale, 'printMessage')}</motion.p>
+
+          {/* Confetti particles */}
           {[...Array(16)].map((_, i) => (
             <motion.div key={i} className="absolute w-2.5 h-2.5 rounded-full"
-              style={{ background: ['#e94560', '#0f3460', '#FFD700', '#00E676', '#FF6B6B', '#2196F3'][i % 6], left: '50%', top: '35%' }}
+              style={{ background: ['#D4AF37', '#F4E5B0', '#C5963A', '#00E676', '#FF6B6B', '#2196F3'][i % 6], left: '50%', top: '35%' }}
               initial={{ x: 0, y: 0, opacity: 1 }}
               animate={{ x: (seededRandom(i + 10) - 0.5) * 250, y: (seededRandom(i + 30) - 0.5) * 250, opacity: 0, scale: [1, 1.3, 0] }}
               transition={{ duration: 1.2, delay: 0.2 + i * 0.04, ease: 'easeOut' }} />
           ))}
 
-          {/* WhatsApp share button */}
+          {/* WhatsApp share */}
           {guestPhone && submittedPhotoId && (
             <motion.button
               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}
@@ -165,29 +187,60 @@ export default function PreviewPage() {
 
           <motion.button initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9 }}
             className="btn-glow w-full" onClick={() => router.push(`/event/${eventId}`)}>
-            📸 {t(locale, 'printAnother')}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="2" y="6" width="20" height="14" rx="3" />
+              <circle cx="12" cy="13" r="4" />
+              <path d="M8 6V4.5A1.5 1.5 0 019.5 3h5A1.5 1.5 0 0116 4.5V6" />
+            </svg>
+            {t(locale, 'printAnother')}
           </motion.button>
         </motion.div>
+        <Footer compact />
       </div>
     );
   }
 
-  // STEP 1: Choose overlay
+  // ===== STEP 1: Choose overlay =====
   if (!selectedOverlayId) {
     return (
       <div className="min-h-dvh relative flex flex-col" dir={isRtl ? 'rtl' : 'ltr'}>
         <ParticleBackground /><LanguageToggle />
+
         <div className="app-header flex items-center justify-center">
-          <h2 className="text-lg font-bold text-white/80">{he ? 'בחר מסגרת' : 'Choose a Frame'} 🖼️</h2>
+          <motion.h2
+            className="text-lg font-bold text-white/80 flex items-center gap-2"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <rect x="7" y="7" width="10" height="10" rx="1" />
+            </svg>
+            {he ? 'בחר מסגרת' : 'Choose a Frame'}
+          </motion.h2>
         </div>
-        <main className="flex-1 px-4 py-4 relative z-10 overflow-y-auto">
-          <div className="w-20 h-20 mx-auto mb-4 rounded-xl overflow-hidden border-2 border-primary/30">
+
+        <main className="flex-1 px-4 py-4 relative z-10 overflow-y-auto pb-24">
+          {/* Photo thumbnail */}
+          <motion.div
+            className="w-20 h-20 mx-auto mb-4 rounded-xl overflow-hidden border-2 border-primary/30 shadow-lg"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring' }}
+          >
             <img src={image} alt="" className="w-full h-full object-cover" />
-          </div>
+          </motion.div>
+
+          {/* Overlay grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-w-lg mx-auto">
             {overlays.map((overlay, i) => (
-              <motion.button key={overlay.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }}
-                className="glass-card overflow-hidden active:scale-95 transition-transform" onClick={() => setSelectedOverlayId(overlay.id)}>
+              <motion.button key={overlay.id}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: i * 0.05 }}
+                className="glass-card overflow-hidden active:scale-95 transition-transform"
+                onClick={() => setSelectedOverlayId(overlay.id)}
+              >
                 <div className="relative overflow-hidden">
                   <img src={overlay.url} alt={overlay.name} className="relative w-full h-auto block z-10 pointer-events-none" />
                   <img src={image} alt="" className="absolute inset-0 w-full h-full object-cover z-0" />
@@ -195,39 +248,79 @@ export default function PreviewPage() {
                 <div className="p-2 text-center"><p className="text-xs font-bold text-white/70 truncate">{overlay.name}</p></div>
               </motion.button>
             ))}
-            <motion.button initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: overlays.length * 0.05 }}
-              className="glass-card overflow-hidden active:scale-95 transition-transform" onClick={() => setSelectedOverlayId('none')}>
+            <motion.button
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: overlays.length * 0.05 }}
+              className="glass-card overflow-hidden active:scale-95 transition-transform"
+              onClick={() => setSelectedOverlayId('none')}
+            >
               <div className="aspect-[3/4] relative"><img src={image} alt="" className="w-full h-full object-cover" /></div>
               <div className="p-2 text-center"><p className="text-xs font-bold text-white/70">{he ? 'ללא מסגרת' : 'No Frame'}</p></div>
             </motion.button>
           </div>
+
           {overlays.length === 0 && (
             <div className="text-center mt-8">
               <p className="text-white/40 text-sm">{he ? 'אין מסגרות זמינות' : 'No overlays available'}</p>
-              <button className="btn-glow mt-4" onClick={() => setSelectedOverlayId('none')}>{he ? 'המשך בלי מסגרת' : 'Continue without frame'}</button>
+              <button className="btn-glow mt-4" onClick={() => setSelectedOverlayId('none')}>
+                {he ? 'המשך בלי מסגרת' : 'Continue without frame'}
+              </button>
             </div>
           )}
         </main>
+
+        {/* Fixed bottom bar */}
         <div className="bottom-bar">
-          <button className="btn-secondary w-full max-w-sm mx-auto" onClick={() => router.push(`/event/${eventId}`)}>← {t(locale, 'retake')}</button>
+          <motion.button
+            className="btn-secondary w-full max-w-sm mx-auto flex items-center justify-center gap-2"
+            whileTap={{ scale: 0.96 }}
+            onClick={() => router.push(`/event/${eventId}`)}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d={isRtl ? "M5 12h14M12 5l7 7-7 7" : "M19 12H5M12 5l-7 7 7 7"} strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {t(locale, 'retake')}
+          </motion.button>
         </div>
       </div>
     );
   }
 
-  // STEP 2: Preview + Print
+  // ===== STEP 2: Preview + Print =====
   return (
     <div className="min-h-dvh relative flex flex-col" dir={isRtl ? 'rtl' : 'ltr'}>
       <ParticleBackground /><LanguageToggle />
+
       <div className="app-header flex items-center justify-center">
-        <h2 className="text-lg font-bold text-white/80">{t(locale, 'preview')} ✨</h2>
+        <motion.h2
+          className="text-lg font-bold text-white/80 flex items-center gap-2"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="1.5">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          {t(locale, 'preview')}
+        </motion.h2>
       </div>
-      <main className="flex-1 flex flex-col items-center justify-center px-5 py-4 relative z-10 overflow-y-auto">
-        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5, type: 'spring' }} className="w-full max-w-sm">
+
+      <main className="flex-1 flex flex-col items-center justify-center px-5 py-4 relative z-10 overflow-y-auto pb-28">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, type: 'spring' }}
+          className="w-full max-w-sm"
+        >
           {selectedOverlayId === 'none' ? (
-            <div className="rounded-2xl overflow-hidden shadow-2xl"><img src={image} alt="Your photo" className="w-full" /></div>
+            <div className="rounded-2xl overflow-hidden shadow-2xl">
+              <img src={image} alt="Your photo" className="w-full" />
+            </div>
           ) : (
-            <OverlayRenderer overlayUrl={selectedOverlay?.url || ''}><img src={image} alt="Your photo" className="w-full h-full object-cover absolute inset-0" /></OverlayRenderer>
+            <OverlayRenderer overlayUrl={selectedOverlay?.url || ''}>
+              <img src={image} alt="Your photo" className="w-full h-full object-cover absolute inset-0" />
+            </OverlayRenderer>
           )}
         </motion.div>
 
@@ -236,20 +329,55 @@ export default function PreviewPage() {
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
             className="mt-4 p-4 rounded-2xl border border-red-500/30 w-full max-w-sm text-center"
             style={{ background: 'rgba(239, 68, 68, 0.1)' }}>
-            <span className="text-2xl block mb-2">🚫</span>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="1.5" className="mx-auto mb-2">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M15 9l-6 6M9 9l6 6" strokeLinecap="round" />
+            </svg>
             <p className="text-sm text-red-400 font-bold">{moderationError}</p>
-            <button className="text-xs text-white/50 mt-2 underline" onClick={() => { setModerationError(null); setSelectedOverlayId(null); router.push(`/event/${eventId}`); }}>
+            <button className="text-xs text-white/50 mt-2 underline"
+              onClick={() => { setModerationError(null); setSelectedOverlayId(null); router.push(`/event/${eventId}`); }}>
               {he ? 'צלם תמונה חדשה' : 'Take a new photo'}
             </button>
           </motion.div>
         )}
       </main>
+
+      {/* Fixed bottom control bar */}
       <div className="bottom-bar">
         <div className="flex items-center gap-3 max-w-sm mx-auto">
-          <button className="btn-secondary flex-1" onClick={() => setSelectedOverlayId(null)}>{he ? 'החלף מסגרת' : 'Change Frame'}</button>
-          <motion.button className="btn-glow flex-[1.5] text-lg" whileTap={{ scale: 0.96 }} onClick={handlePrint} disabled={printing}>
-            {printing ? <motion.span animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} className="inline-block">⏳</motion.span>
-              : <>🖨️ {t(locale, 'print')}</>}
+          <motion.button
+            className="btn-secondary flex-1 flex items-center justify-center gap-2"
+            whileTap={{ scale: 0.96 }}
+            onClick={() => setSelectedOverlayId(null)}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <rect x="7" y="7" width="10" height="10" rx="1" />
+            </svg>
+            {he ? 'החלף מסגרת' : 'Change Frame'}
+          </motion.button>
+          <motion.button
+            className="btn-glow flex-[1.5] text-lg flex items-center justify-center gap-2"
+            whileTap={{ scale: 0.96 }}
+            onClick={handlePrint}
+            disabled={printing}
+          >
+            {printing ? (
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                className="w-6 h-6 rounded-full border-2 border-transparent"
+                style={{ borderTopColor: '#000', borderRightColor: '#000' }}
+              />
+            ) : (
+              <>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2" />
+                  <rect x="6" y="14" width="12" height="8" />
+                </svg>
+                {t(locale, 'print')}
+              </>
+            )}
           </motion.button>
         </div>
       </div>

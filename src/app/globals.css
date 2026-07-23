@@ -308,6 +308,25 @@ body {
   max-height: calc(var(--vh, 1vh) * 62);
 }
 
+/* ===== ASPECT RATIO VIEWFINDER ===== */
+.aspect-square {
+  aspect-ratio: 1 / 1;
+}
+
+.camera-viewfinder.aspect-square video,
+.camera-viewfinder.aspect-square img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.camera-viewfinder[class*="aspect-[9/16]"] video,
+.camera-viewfinder[class*="aspect-[9/16]"] img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 /* ===== COUNTDOWN ===== */
 .countdown-number {
   font-size: 6rem;

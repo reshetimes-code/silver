@@ -9,7 +9,14 @@ export async function POST(request: NextRequest) {
   }
 
   const dropboxToken = process.env.DROPBOX_ACCESS_TOKEN;
-  const dropboxFolder = process.env.DROPBOX_FOLDER || '/HotFolderPrints';
+  // Fix: Git Bash on Windows may mangle env var paths - strip Windows prefix if present
+  let dropboxFolder = process.env.DROPBOX_FOLDER || '/BeautifulPhotobooth/SelphieBooth/Computer1';
+  if (dropboxFolder.includes('Program Files')) {
+    dropboxFolder = '/BeautifulPhotobooth/SelphieBooth/Computer1';
+  }
+  if (!dropboxFolder.startsWith('/')) {
+    dropboxFolder = '/' + dropboxFolder;
+  }
 
   if (!dropboxToken) {
     return NextResponse.json({ error: 'Dropbox not configured' }, { status: 500 });
