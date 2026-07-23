@@ -28,20 +28,24 @@ export async function POST(request: NextRequest) {
       const base64Data = photo.photoUrl.replace(/^data:image\/\w+;base64,/, '');
       const buffer = Buffer.from(base64Data, 'base64');
 
-      const fileName = `${photo.event.name}_${photo.id.slice(0, 8)}_${Date.now()}.jpg`;
+      // Sanitize filename to ASCII only (Dropbox headers require it)
+      const safeName = photo.event.name.replace(/[^\x20-\x7E]/g, '').replace(/[/\\:*?"<>|]/g, '_').trim() || 'photo';
+      const fileName = `${safeName}_${photo.id.slice(0, 8)}_${Date.now()}.jpg`;
       const filePath = `${dropboxFolder}/${fileName}`;
 
-      // Upload to Dropbox
+      // Upload to Dropbox - use Dropbox-API-Arg as ASCII-safe JSON
+      const apiArg = JSON.stringify({
+        path: filePath,
+        mode: 'add',
+        autorename: true,
+        mute: false,
+      });
+
       const uploadRes = await fetch('https://content.dropboxapi.com/2/files/upload', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${dropboxToken}`,
-          'Dropbox-API-Arg': JSON.stringify({
-            path: filePath,
-            mode: 'add',
-            autorename: true,
-            mute: false,
-          }),
+          'Dropbox-API-Arg': apiArg,
           'Content-Type': 'application/octet-stream',
         },
         body: buffer,
