@@ -202,15 +202,6 @@ export default function LandingPage() {
                         {he ? 'האירועים שלי' : 'My Events'}
                       </Link>
 
-                      <Link href="/admin" onClick={() => setMenuOpen(false)}
-                        className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-white/70 hover:bg-white/5 active:bg-white/10 transition-colors">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="1.5">
-                          <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
-                          <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
-                        </svg>
-                        {he ? 'לוח בקרה (מנהל)' : 'Admin Panel'}
-                      </Link>
-
                       <button onClick={() => {
                         localStorage.removeItem('auth-token');
                         localStorage.removeItem('auth-user');
@@ -227,6 +218,16 @@ export default function LandingPage() {
                       </button>
                     </>
                   )}
+
+                  {/* Admin — always visible */}
+                  <Link href="/admin" onClick={() => setMenuOpen(false)}
+                    className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-white/70 hover:bg-white/5 active:bg-white/10 transition-colors">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="1.5">
+                      <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+                      <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
+                    </svg>
+                    {he ? 'לוח בקרה (מנהל)' : 'Admin Panel'}
+                  </Link>
 
                   <button onClick={() => { toggleLocale(); setMenuOpen(false); }}
                     className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-white/70 hover:bg-white/5 active:bg-white/10 transition-colors">
