@@ -127,13 +127,13 @@ body {
   backdrop-filter: blur(10px);
   border: 1.5px solid rgba(212, 175, 55, 0.35);
   border-radius: 16px;
-  padding: 16px 28px;
+  padding: 18px 32px;
   color: #F4E5B0;
   font-weight: 700;
-  font-size: 1.05rem;
+  font-size: 1.15rem;
   cursor: pointer;
   transition: all 0.2s ease;
-  min-height: 54px;
+  min-height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;

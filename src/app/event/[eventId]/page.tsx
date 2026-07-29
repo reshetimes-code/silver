@@ -28,8 +28,8 @@ type TimerValue = typeof TIMER_OPTIONS[number];
 type AspectRatio = '1:1' | '9:16';
 
 const ASPECT_RATIOS: { value: AspectRatio; label: string; labelHe: string; icon: string; width: number; height: number }[] = [
-  { value: '1:1', label: 'Square', labelHe: 'מרובע', icon: '⬜', width: 1080, height: 1080 },
-  { value: '9:16', label: 'TikTok', labelHe: 'טיקטוק', icon: '📱', width: 1080, height: 1920 },
+  { value: '1:1', label: 'Square', labelHe: 'מרובע', icon: '⬜', width: 2160, height: 2160 },
+  { value: '9:16', label: 'TikTok', labelHe: 'טיקטוק', icon: '📱', width: 2160, height: 3840 },
 ];
 
 export default function CapturePhotoPage() {
@@ -470,8 +470,8 @@ export default function CapturePhotoPage() {
               <div className={`camera-viewfinder w-full relative overflow-hidden ${viewfinderAspect}`}
                 style={{ maxHeight: aspectRatio === '9:16' ? '65vh' : '80vw' }}>
                 <Webcam key={`${facingMode}-${aspectRatio}`} ref={webcamRef} audio={false}
-                  screenshotFormat="image/jpeg" screenshotQuality={0.92}
-                  videoConstraints={{ facingMode, width: { ideal: 1920 }, height: { ideal: aspectRatio === '9:16' ? 3413 : 1920 } }}
+                  screenshotFormat="image/jpeg" screenshotQuality={1}
+                  videoConstraints={{ facingMode, width: { ideal: 3840 }, height: { ideal: aspectRatio === '9:16' ? 6826 : 3840 } }}
                   className="w-full h-full object-cover rounded-2xl"
                   mirrored={facingMode === 'user'}
                 />
