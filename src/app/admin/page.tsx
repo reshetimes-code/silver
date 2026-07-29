@@ -292,14 +292,20 @@ function OverlaysTab() {
 
   useEffect(() => { loadData(); }, []);
 
+  // Check if current user is super admin
+  const storedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('auth-user') || '{}') : {};
+  const isSuperAdmin = storedUser.role === 'super_admin';
+
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files || !uploadEventId) return;
+    if (!files) return;
+    // Super admin uploads globally (no eventId), account manager needs eventId
+    if (!isSuperAdmin && !uploadEventId) return;
     setUploading(true);
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const name = file.name.replace(/\.[^.]+$/, '');
-      await api.uploadOverlay(file, name, uploadEventId);
+      await api.uploadOverlay(file, name, isSuperAdmin ? undefined : uploadEventId);
     }
     setUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -321,31 +327,44 @@ function OverlaysTab() {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      {/* Upload section — select event first */}
-      <div className="glass-card p-4 mb-4">
-        <p className="text-xs text-white/50 mb-2">{he ? 'העלה מסגרות לאירוע:' : 'Upload frames for event:'}</p>
-        <div className="flex gap-2">
-          <select
-            value={uploadEventId}
-            onChange={(e) => setUploadEventId(e.target.value)}
-            className="flex-1 px-3 py-2.5 rounded-xl bg-white/8 border border-white/15 text-white text-sm focus:outline-none focus:border-primary"
-          >
-            <option value="" className="bg-[#0a0a0a] text-white">{he ? 'בחר אירוע...' : 'Select event...'}</option>
-            {events.map(ev => (
-              <option key={ev.id} value={ev.id} className="bg-[#0a0a0a] text-white">{ev.name}</option>
-            ))}
-          </select>
-          <input ref={fileInputRef} type="file" accept="image/png" multiple className="hidden" onChange={handleUpload} />
-          <button
-            className="btn-glow px-4 text-sm"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading || !uploadEventId}
-            style={{ opacity: uploadEventId ? 1 : 0.4 }}
-          >
-            {uploading ? '⏳' : '+'} {he ? 'העלה' : 'Upload'}
-          </button>
+      {/* Upload section */}
+      <input ref={fileInputRef} type="file" accept="image/png" multiple className="hidden" onChange={handleUpload} />
+
+      {isSuperAdmin ? (
+        /* Super admin — simple upload button, no event selection */
+        <button
+          className="btn-glow w-full mb-5"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+        >
+          {uploading ? '⏳' : '+'} {he ? 'העלה מסגרות PNG (לכל האירועים)' : 'Upload PNG Overlays (All Events)'}
+        </button>
+      ) : (
+        /* Account manager — select event first */
+        <div className="glass-card p-4 mb-4">
+          <p className="text-xs text-white/50 mb-2">{he ? 'העלה מסגרות לאירוע:' : 'Upload frames for event:'}</p>
+          <div className="flex gap-2">
+            <select
+              value={uploadEventId}
+              onChange={(e) => setUploadEventId(e.target.value)}
+              className="flex-1 px-3 py-2.5 rounded-xl bg-white/8 border border-white/15 text-white text-sm focus:outline-none focus:border-primary"
+            >
+              <option value="">{he ? 'בחר אירוע...' : 'Select event...'}</option>
+              {events.map(ev => (
+                <option key={ev.id} value={ev.id}>{ev.name}</option>
+              ))}
+            </select>
+            <button
+              className="btn-glow px-4 text-sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading || !uploadEventId}
+              style={{ opacity: uploadEventId ? 1 : 0.4 }}
+            >
+              {uploading ? '⏳' : '+'} {he ? 'העלה' : 'Upload'}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Filter by event */}
       <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
