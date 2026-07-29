@@ -458,6 +458,12 @@ body {
   animation: discoLight3 12s ease-in-out infinite;
 }
 
+/* ===== SELECT DROPDOWN FIX ===== */
+select option {
+  background: #0a0a0a;
+  color: #ffffff;
+}
+
 /* ===== MOBILE INPUT STYLES ===== */
 input[type="text"],
 input[type="date"],

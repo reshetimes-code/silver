@@ -55,12 +55,12 @@ export default function AdminPage() {
         <Link href="/"><Logo size="xl" animate={false} /></Link>
         <div className="flex items-center gap-3 mt-3">
           {currentUser && (
-            <span className="text-[10px] px-2.5 py-1 rounded-full font-bold"
+            <span className="text-xs px-2.5 py-1 rounded-full font-bold"
               style={{ background: isSuperAdmin ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.08)', color: isSuperAdmin ? '#D4AF37' : 'rgba(255,255,255,0.5)' }}>
               {currentUser.name} • {isSuperAdmin ? (he ? 'מנהל אתר' : 'Super Admin') : (he ? 'מנהל חשבון' : 'Account Manager')}
             </span>
           )}
-          <button onClick={handleLogout} className="text-white/30 text-[10px] hover:text-white/60 transition-colors px-2 py-1 rounded-full bg-white/5">
+          <button onClick={handleLogout} className="text-white/30 text-xs hover:text-white/60 transition-colors px-2 py-1 rounded-full bg-white/5">
             {he ? 'התנתק' : 'Logout'}
           </button>
         </div>
@@ -153,7 +153,7 @@ function EventsTab() {
     loadEvents();
   };
 
-  if (loading) return <div className="text-center py-10"><span className="text-3xl">⏳</span></div>;
+  if (loading) return <div className="flex justify-center py-12"><div className="w-8 h-8 rounded-full border-2 border-transparent animate-spin" style={{ borderTopColor: '#D4AF37', borderRightColor: '#D4AF37' }} /></div>;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -161,7 +161,7 @@ function EventsTab() {
       <div className="glass-card p-4 mb-4 flex items-center justify-between">
         <div>
           <p className="text-sm font-bold text-white/80">Show Language Button</p>
-          <p className="text-[10px] text-white/40">Show/hide HEB/ENG toggle for guests</p>
+          <p className="text-xs text-white/40">Show/hide HEB/ENG toggle for guests</p>
         </div>
         <button
           className={`w-12 h-7 rounded-full relative transition-colors ${showLanguageToggle ? 'bg-primary' : 'bg-white/20'}`}
@@ -224,7 +224,7 @@ function EventsTab() {
                   <h3 className="text-base font-bold text-white">{event.name}</h3>
                   <p className="text-xs text-white/40">{event.date.replace(/-/g, '.')}</p>
                 </div>
-                <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${event.active ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
+                <span className={`px-2 py-1 rounded-full text-xs font-bold ${event.active ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
                   {event.active ? (he ? 'פעיל' : 'Active') : (he ? 'כבוי' : 'Off')}
                 </span>
               </div>
@@ -249,7 +249,7 @@ function EventsTab() {
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
                     className="mt-3 p-4 bg-white rounded-2xl text-center overflow-hidden">
                     <QRCodeDisplay eventId={event.id} />
-                    <p className="text-[10px] text-gray-400 mt-2 break-all select-all">
+                    <p className="text-xs text-gray-400 mt-2 break-all select-all">
                       {typeof window !== 'undefined' ? `${window.location.origin}/event/${event.id}` : ''}
                     </p>
                   </motion.div>
@@ -317,7 +317,7 @@ function OverlaysTab() {
     ? overlays.filter(o => o.eventId === selectedEventId)
     : overlays;
 
-  if (loading) return <div className="text-center py-10"><span className="text-3xl">⏳</span></div>;
+  if (loading) return <div className="flex justify-center py-12"><div className="w-8 h-8 rounded-full border-2 border-transparent animate-spin" style={{ borderTopColor: '#D4AF37', borderRightColor: '#D4AF37' }} /></div>;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -330,9 +330,9 @@ function OverlaysTab() {
             onChange={(e) => setUploadEventId(e.target.value)}
             className="flex-1 px-3 py-2.5 rounded-xl bg-white/8 border border-white/15 text-white text-sm focus:outline-none focus:border-primary"
           >
-            <option value="">{he ? 'בחר אירוע...' : 'Select event...'}</option>
+            <option value="" className="bg-[#0a0a0a] text-white">{he ? 'בחר אירוע...' : 'Select event...'}</option>
             {events.map(ev => (
-              <option key={ev.id} value={ev.id}>{ev.name}</option>
+              <option key={ev.id} value={ev.id} className="bg-[#0a0a0a] text-white">{ev.name}</option>
             ))}
           </select>
           <input ref={fileInputRef} type="file" accept="image/png" multiple className="hidden" onChange={handleUpload} />
@@ -379,13 +379,13 @@ function OverlaysTab() {
                   backgroundImage: 'repeating-conic-gradient(#0a0a0a 0% 25%, #1a1a1a 0% 50%)',
                   backgroundSize: '12px 12px',
                 }} />
-                <img src={overlay.url} alt={overlay.name} className="relative w-full h-full object-contain p-1" />
+                <img src={api.getOverlayImageUrl(overlay.id)} alt={overlay.name} className="relative w-full h-full object-contain p-1" loading="lazy" />
               </div>
               <div className="p-2">
                 <p className="text-xs font-bold text-white/70 truncate">{overlay.name}</p>
-                {eventName && <p className="text-[9px] text-primary/50 truncate">{eventName}</p>}
+                {eventName && <p className="text-xs text-primary/50 truncate">{eventName}</p>}
                 <div className="flex justify-end mt-1">
-                  <button className="w-6 h-6 rounded-full bg-red-500/15 text-red-400 flex items-center justify-center text-[10px] active:bg-red-500/30"
+                  <button className="w-6 h-6 rounded-full bg-red-500/15 text-red-400 flex items-center justify-center text-xs active:bg-red-500/30"
                     onClick={() => handleDeleteOverlay(overlay.id)}>✕</button>
                 </div>
               </div>
@@ -514,7 +514,7 @@ function PhotosTab() {
     }
   };
 
-  if (loading) return <div className="text-center py-10"><span className="text-3xl">⏳</span></div>;
+  if (loading) return <div className="flex justify-center py-12"><div className="w-8 h-8 rounded-full border-2 border-transparent animate-spin" style={{ borderTopColor: '#D4AF37', borderRightColor: '#D4AF37' }} /></div>;
 
   // ===== GALLERY VIEW =====
   if (selectedEventId) {
@@ -522,7 +522,7 @@ function PhotosTab() {
     const pendingReview = photos.filter((p) => p.moderationStatus === 'pending_review');
     const approvedPhotos = photos.filter((p) => p.moderationStatus === 'approved');
 
-    if (loadingPhotos) return <div className="text-center py-10"><span className="text-3xl">⏳</span></div>;
+    if (loadingPhotos) return <div className="flex justify-center py-12"><div className="w-8 h-8 rounded-full border-2 border-transparent animate-spin" style={{ borderTopColor: '#D4AF37', borderRightColor: '#D4AF37' }} /></div>;
 
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -546,16 +546,16 @@ function PhotosTab() {
                 <div key={photo.id} className="glass-card overflow-hidden border border-yellow-500/30">
                   <div className="relative bg-black">
                     <img src={api.getPhotoImageUrl(photo.id)} alt="" className="w-full aspect-[3/4] object-cover" loading="lazy" />
-                    <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded-full bg-yellow-500/80 text-[8px] font-bold text-black">
+                    <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded-full bg-yellow-500/80 text-xs font-bold text-black">
                       {photo.moderationReason === 'suspicious_content' ? '🔍' : photo.moderationReason === 'low_face_confidence' ? '👤?' : '⚠️'}
                     </div>
                   </div>
                   <div className="p-2">
-                    {photo.phoneNumber && <p className="text-[10px] text-white/40 mb-1">📱 {photo.phoneNumber}</p>}
+                    {photo.phoneNumber && <p className="text-xs text-white/40 mb-1">📱 {photo.phoneNumber}</p>}
                     <div className="flex gap-1.5">
-                      <button className="flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-green-500/20 text-green-400 active:bg-green-500/30"
+                      <button className="flex-1 py-1.5 rounded-lg text-xs font-bold bg-green-500/20 text-green-400 active:bg-green-500/30"
                         onClick={() => handleApprovePhoto(photo.id)}>✓ {he ? 'אשר' : 'Approve'}</button>
-                      <button className="flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-red-500/20 text-red-400 active:bg-red-500/30"
+                      <button className="flex-1 py-1.5 rounded-lg text-xs font-bold bg-red-500/20 text-red-400 active:bg-red-500/30"
                         onClick={() => handleRejectPhoto(photo.id)}>✕ {he ? 'דחה' : 'Reject'}</button>
                     </div>
                   </div>
@@ -613,28 +613,28 @@ function PhotosTab() {
                   </div>
                   {/* Print status badge */}
                   {photo.printStatus === 'sent' && (
-                    <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded-full bg-purple-500/80 text-[8px] font-bold text-white z-20">🖨️</div>
+                    <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded-full bg-purple-500/80 text-xs font-bold text-white z-20">🖨️</div>
                   )}
                 </div>
                 <div className="p-2">
                   <div className="flex items-center justify-between mb-1.5">
-                    <p className="text-[10px] text-white/30">{new Date(photo.createdAt).toLocaleTimeString()}</p>
-                    {photo.phoneNumber && <p className="text-[10px] text-white/40">📱 {photo.phoneNumber}</p>}
+                    <p className="text-xs text-white/30">{new Date(photo.createdAt).toLocaleTimeString()}</p>
+                    {photo.phoneNumber && <p className="text-xs text-white/40">📱 {photo.phoneNumber}</p>}
                   </div>
                   <div className="flex gap-1.5">
-                    <button className="flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-white/8 text-white/60 active:bg-white/15"
+                    <button className="flex-1 py-1.5 rounded-lg text-xs font-bold bg-white/8 text-white/60 active:bg-white/15"
                       onClick={() => {
                         const link = document.createElement('a');
                         link.href = photo.photoUrl;
                         link.download = `photo_${photo.id.slice(0, 8)}.jpg`;
                         link.click();
                       }}>📥</button>
-                    <button className="flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-green-500/15 text-green-400 active:bg-green-500/25"
+                    <button className="flex-1 py-1.5 rounded-lg text-xs font-bold bg-green-500/15 text-green-400 active:bg-green-500/25"
                       onClick={() => {
                         const photoUrl = `${window.location.origin}/api/photos/${photo.id}/image`;
                         window.open(`https://wa.me/?text=${encodeURIComponent('📸 ' + (event?.name || '') + '\n' + photoUrl)}`, '_blank');
                       }}>📤</button>
-                    <button className="flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-red-500/15 text-red-400 active:bg-red-500/25"
+                    <button className="flex-1 py-1.5 rounded-lg text-xs font-bold bg-red-500/15 text-red-400 active:bg-red-500/25"
                       onClick={() => handleDeletePhoto(photo.id)}>🗑️</button>
                   </div>
                 </div>
@@ -671,7 +671,7 @@ function PhotosTab() {
               <div className="flex items-center gap-3 flex-shrink-0">
                 <div className="text-center">
                   <p className="text-lg font-bold text-primary">{count}</p>
-                  <p className="text-[10px] text-white/40">{he ? 'תמונות' : 'photos'}</p>
+                  <p className="text-xs text-white/40">{he ? 'תמונות' : 'photos'}</p>
                 </div>
                 <span className="text-white/30">›</span>
               </div>
@@ -737,7 +737,7 @@ function UsersTab() {
                 <p className="text-xs text-white/40 truncate">{user.email}</p>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${
+                <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
                   user.role === 'super_admin'
                     ? 'bg-primary/20 text-[#D4AF37]'
                     : 'bg-white/8 text-white/50'
@@ -748,18 +748,15 @@ function UsersTab() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-[10px] text-white/30">
+            <div className="flex items-center justify-between text-xs text-white/30">
               <div className="flex items-center gap-3">
                 {user.phone && <span>📱 {user.phone}</span>}
                 <span>📅 {new Date(user.createdAt).toLocaleDateString()}</span>
                 <span>🎉 {user._count.events} {he ? 'אירועים' : 'events'}</span>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => toggleRole(user)} className="px-2 py-1 rounded text-[10px] bg-white/5 text-white/40 hover:bg-white/10 transition-colors">
-                  {he ? 'שנה תפקיד' : 'Change Role'}
-                </button>
                 <button onClick={() => toggleActive(user)}
-                  className={`px-2 py-1 rounded text-[10px] transition-colors ${user.active ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20' : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'}`}>
+                  className={`px-2 py-1 rounded text-xs transition-colors ${user.active ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20' : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'}`}>
                   {user.active ? (he ? 'השבת' : 'Disable') : (he ? 'הפעל' : 'Enable')}
                 </button>
               </div>

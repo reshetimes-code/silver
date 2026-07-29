@@ -115,10 +115,15 @@ export const api = {
   },
 
   // ===== Overlays =====
-  async getOverlays(eventId?: string) {
-    const url = eventId ? `${BASE}/api/overlays?eventId=${eventId}` : `${BASE}/api/overlays`;
-    const res = await fetch(url);
+  async getOverlays(eventId?: string, full = false) {
+    const params = new URLSearchParams();
+    if (eventId) params.set('eventId', eventId);
+    if (full) params.set('full', 'true');
+    const res = await fetch(`${BASE}/api/overlays?${params.toString()}`);
     return res.json();
+  },
+  getOverlayImageUrl(overlayId: string) {
+    return `/api/overlays/${overlayId}/image`;
   },
   async uploadOverlay(file: File, name: string, eventId?: string) {
     const formData = new FormData();
