@@ -1,6 +1,51 @@
 import { prisma } from './db';
 import sharp from 'sharp';
 
+// Cache the access token in memory
+let cachedAccessToken: string | null = null;
+let tokenExpiresAt = 0;
+
+async function getAccessToken(): Promise<string> {
+  // If we have a valid cached token, use it
+  if (cachedAccessToken && Date.now() < tokenExpiresAt) {
+    return cachedAccessToken;
+  }
+
+  const refreshToken = process.env.DROPBOX_REFRESH_TOKEN;
+  const appKey = process.env.DROPBOX_APP_KEY;
+  const appSecret = process.env.DROPBOX_APP_SECRET;
+
+  // If we have refresh token + app credentials, use OAuth refresh
+  if (refreshToken && appKey && appSecret) {
+    const res = await fetch('https://api.dropboxapi.com/oauth2/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+        client_id: appKey,
+        client_secret: appSecret,
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      cachedAccessToken = data.access_token;
+      // Expire 5 minutes early to be safe
+      tokenExpiresAt = Date.now() + (data.expires_in - 300) * 1000;
+      return cachedAccessToken!;
+    }
+
+    console.error('Dropbox refresh token failed:', await res.text());
+  }
+
+  // Fallback to static access token
+  const staticToken = process.env.DROPBOX_ACCESS_TOKEN;
+  if (staticToken) return staticToken;
+
+  throw new Error('No Dropbox credentials configured');
+}
+
 async function compositePhotoWithOverlay(photoBase64: string, overlayBase64: string | null): Promise<Buffer> {
   const photoData = photoBase64.replace(/^data:image\/\w+;base64,/, '');
   const photoBuffer = Buffer.from(photoData, 'base64');
@@ -29,15 +74,12 @@ async function compositePhotoWithOverlay(photoBase64: string, overlayBase64: str
 }
 
 export async function uploadToDropbox(photoId: string): Promise<{ success: boolean; error?: string }> {
-  const dropboxToken = process.env.DROPBOX_ACCESS_TOKEN;
-  if (!dropboxToken) {
-    return { success: false, error: 'Dropbox not configured' };
-  }
-
-  let dropboxFolder = process.env.DROPBOX_FOLDER || '/BeautifulPhotobooth/SelphieBooth/Computer1';
-  if (!dropboxFolder.startsWith('/')) dropboxFolder = '/' + dropboxFolder;
-
   try {
+    const accessToken = await getAccessToken();
+
+    let dropboxFolder = process.env.DROPBOX_FOLDER || '/BeautifulPhotobooth/SelphieBooth/Computer1';
+    if (!dropboxFolder.startsWith('/')) dropboxFolder = '/' + dropboxFolder;
+
     const photo = await prisma.photo.findUnique({
       where: { id: photoId },
       include: { event: true, overlay: true },
@@ -50,14 +92,16 @@ export async function uploadToDropbox(photoId: string): Promise<{ success: boole
       photo.overlay?.url || null
     );
 
-    const safeName = photo.event.name.replace(/[^\x20-\x7E]/g, '').replace(/[/\\:*?"<>|]/g, '_').trim() || 'photo';
-    const fileName = `${safeName}_${photo.id.slice(0, 8)}_${Date.now()}.jpg`;
-    const filePath = `${dropboxFolder}/${fileName}`;
+    // Create event subfolder
+    const safeEventName = photo.event.name.replace(/[^\x20-\x7E]/g, '').replace(/[/\\:*?"<>|]/g, '_').trim() || 'Event';
+    const eventFolder = `${dropboxFolder}/${safeEventName}`;
+    const fileName = `photo_${photo.id.slice(0, 8)}_${Date.now()}.jpg`;
+    const filePath = `${eventFolder}/${fileName}`;
 
     const uploadRes = await fetch('https://content.dropboxapi.com/2/files/upload', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${dropboxToken}`,
+        'Authorization': `Bearer ${accessToken}`,
         'Dropbox-API-Arg': JSON.stringify({ path: filePath, mode: 'add', autorename: true, mute: false }),
         'Content-Type': 'application/octet-stream',
       },
