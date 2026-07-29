@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { moderateImage } from '@/lib/moderation';
+import { uploadToDropbox } from '@/lib/dropbox';
 
 export async function GET(request: NextRequest) {
   const eventId = request.nextUrl.searchParams.get('eventId');
 
   const where = eventId && eventId !== 'all' ? { eventId } : {};
-  // Don't include full photoUrl in list query — it's huge base64 data
   const photos = await prisma.photo.findMany({
     where,
     orderBy: { createdAt: 'desc' },
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const body = await request.json();
 
-  // AI Moderation - check the image before saving
+  // AI Moderation
   const moderation = await moderateImage(body.image);
 
   if (moderation.status === 'rejected') {
@@ -54,6 +54,13 @@ export async function POST(request: NextRequest) {
       moderationReason: moderation.reason || null,
     },
   });
+
+  // Auto-upload to Dropbox if approved (don't wait — fire and forget)
+  if (moderation.status === 'approved') {
+    uploadToDropbox(photo.id).catch((err) => {
+      console.error('Auto Dropbox upload failed:', err);
+    });
+  }
 
   return NextResponse.json(photo);
 }

@@ -123,19 +123,36 @@ export default function CapturePhotoPage() {
         canvas.width = currentAR.width;
         canvas.height = currentAR.height;
         ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, currentAR.width, currentAR.height);
-        resolve(canvas.toDataURL('image/jpeg', 0.92));
+        resolve(canvas.toDataURL('image/jpeg', 1.0));
       };
       img.src = imageSrc;
     });
   }, [currentAR]);
 
   const captureNow = useCallback(async () => {
-    const imageSrc = webcamRef.current?.getScreenshot();
-    if (imageSrc) {
-      const cropped = await cropToAspectRatio(imageSrc);
-      setCapturedImage(cropped);
+    // Capture at FULL video resolution, not display size
+    const video = webcamRef.current?.video;
+    if (!video) return;
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if (!vw || !vh) return;
+
+    const captureCanvas = document.createElement('canvas');
+    captureCanvas.width = vw;
+    captureCanvas.height = vh;
+    const ctx = captureCanvas.getContext('2d')!;
+
+    // If front camera, mirror horizontally
+    if (facingMode === 'user') {
+      ctx.translate(vw, 0);
+      ctx.scale(-1, 1);
     }
-  }, [cropToAspectRatio]);
+    ctx.drawImage(video, 0, 0, vw, vh);
+
+    const fullResImage = captureCanvas.toDataURL('image/jpeg', 1.0);
+    const cropped = await cropToAspectRatio(fullResImage);
+    setCapturedImage(cropped);
+  }, [cropToAspectRatio, facingMode]);
 
   const cancelTimer = useCallback(() => {
     if (countdownRef.current) {
@@ -471,7 +488,7 @@ export default function CapturePhotoPage() {
                 style={{ maxHeight: aspectRatio === '9:16' ? '65vh' : '80vw' }}>
                 <Webcam key={`${facingMode}-${aspectRatio}`} ref={webcamRef} audio={false}
                   screenshotFormat="image/jpeg" screenshotQuality={1}
-                  videoConstraints={{ facingMode, width: { ideal: 3840 }, height: { ideal: aspectRatio === '9:16' ? 6826 : 3840 } }}
+                  videoConstraints={{ facingMode, width: { ideal: 1920, min: 1280 }, height: { ideal: 1920, min: 1280 } }}
                   className="w-full h-full object-cover rounded-2xl"
                   mirrored={facingMode === 'user'}
                 />

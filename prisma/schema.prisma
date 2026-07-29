@@ -40,13 +40,14 @@ model Event {
 }
 
 model Overlay {
-  id        String   @id @default(uuid())
-  name      String
-  url       String
-  eventId   String?
-  createdAt DateTime @default(now())
-  photos    Photo[]
-  event     Event?   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  id         String   @id @default(uuid())
+  name       String
+  url        String
+  eventId    String?
+  photoScale Int      @default(90)  // 50-100: how much photo fills the frame (100=full cover, lower=more padding)
+  createdAt  DateTime @default(now())
+  photos     Photo[]
+  event      Event?   @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@index([eventId])
 }
