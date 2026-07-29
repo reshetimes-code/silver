@@ -6,10 +6,24 @@ export async function GET(request: NextRequest) {
   const eventId = request.nextUrl.searchParams.get('eventId');
 
   const where = eventId && eventId !== 'all' ? { eventId } : {};
+  // Don't include full photoUrl in list query — it's huge base64 data
   const photos = await prisma.photo.findMany({
     where,
     orderBy: { createdAt: 'desc' },
-    include: { event: true, overlay: true },
+    select: {
+      id: true,
+      eventId: true,
+      overlayId: true,
+      deviceId: true,
+      phoneNumber: true,
+      status: true,
+      moderationStatus: true,
+      moderationReason: true,
+      printStatus: true,
+      createdAt: true,
+      event: { select: { id: true, name: true } },
+      overlay: { select: { id: true, name: true } },
+    },
   });
 
   return NextResponse.json(photos);

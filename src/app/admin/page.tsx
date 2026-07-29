@@ -13,37 +13,61 @@ import AdminAuth from '@/components/ui/AdminAuth';
 import ParticleBackground from '@/components/ui/ParticleBackground';
 import Link from 'next/link';
 
-type Tab = 'events' | 'overlays' | 'photos';
+type Tab = 'events' | 'overlays' | 'photos' | 'users';
 
-interface EventData { id: string; name: string; date: string; maxPrintsPerDevice: number; active: boolean; }
+interface AuthUser { id: string; email: string; name: string; role: string; }
+interface EventData { id: string; name: string; date: string; maxPrintsPerDevice: number; active: boolean; owner?: { name: string; email: string }; }
 interface OverlayData { id: string; name: string; url: string; }
 interface PhotoData { id: string; eventId: string; photoUrl: string; overlayId: string | null; deviceId: string; phoneNumber: string; moderationStatus: string; moderationReason: string | null; printStatus: string; createdAt: string; event?: EventData; overlay?: OverlayData; }
+interface UserData { id: string; email: string; name: string; role: string; active: boolean; phone: string; createdAt: string; _count: { events: number }; }
 
 export default function AdminPage() {
   const hydrated = useHydrated();
   const { locale } = useStore();
   const [tab, setTab] = useState<Tab>('events');
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const isRtl = locale === 'he';
   const he = locale === 'he';
 
+  const isSuperAdmin = currentUser?.role === 'super_admin';
+
   if (!hydrated) return null;
 
+  const tabs: { id: Tab; label: string; icon: string }[] = [
+    { id: 'events', label: he ? 'אירועים' : 'Events', icon: '🎉' },
+    { id: 'overlays', label: he ? 'מסגרות' : 'Overlays', icon: '🖼️' },
+    { id: 'photos', label: he ? 'תמונות' : 'Photos', icon: '📸' },
+    ...(isSuperAdmin ? [{ id: 'users' as Tab, label: he ? 'משתמשים' : 'Users', icon: '👥' }] : []),
+  ];
+
+  const handleLogout = () => {
+    api.logout();
+    window.location.reload();
+  };
+
   return (
-    <AdminAuth>
+    <AdminAuth onUser={(u) => setCurrentUser(u)}>
     <div className="min-h-dvh relative" dir={isRtl ? 'rtl' : 'ltr'}>
       <ParticleBackground />
       <LanguageToggle />
-      <div className="app-header flex items-center justify-between">
-        <Link href="/"><Logo size="sm" /></Link>
-        <h1 className="text-sm font-bold text-white/80">{t(locale, 'admin')}</h1>
+      {/* Big centered logo */}
+      <div className="pt-6 pb-4 flex flex-col items-center relative z-10">
+        <Link href="/"><Logo size="xl" animate={false} /></Link>
+        <div className="flex items-center gap-3 mt-3">
+          {currentUser && (
+            <span className="text-[10px] px-2.5 py-1 rounded-full font-bold"
+              style={{ background: isSuperAdmin ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.08)', color: isSuperAdmin ? '#D4AF37' : 'rgba(255,255,255,0.5)' }}>
+              {currentUser.name} • {isSuperAdmin ? (he ? 'מנהל אתר' : 'Super Admin') : (he ? 'מנהל חשבון' : 'Account Manager')}
+            </span>
+          )}
+          <button onClick={handleLogout} className="text-white/30 text-[10px] hover:text-white/60 transition-colors px-2 py-1 rounded-full bg-white/5">
+            {he ? 'התנתק' : 'Logout'}
+          </button>
+        </div>
       </div>
-      <div className="sticky top-[53px] z-30 bg-black/90 backdrop-blur-lg border-b border-[rgba(212,175,55,0.1)]">
+      <div className="sticky top-0 z-30 bg-black/90 backdrop-blur-lg border-b border-[rgba(212,175,55,0.1)]">
         <div className="flex max-w-3xl mx-auto">
-          {([
-            { id: 'events' as Tab, label: he ? 'אירועים' : 'Events', icon: '🎉' },
-            { id: 'overlays' as Tab, label: he ? 'מסגרות' : 'Overlays', icon: '🖼️' },
-            { id: 'photos' as Tab, label: he ? 'תמונות' : 'Photos', icon: '📸' },
-          ]).map((tb) => (
+          {tabs.map((tb) => (
             <button key={tb.id}
               className={`flex-1 py-3 text-center text-xs font-bold transition-all relative ${tab === tb.id ? 'text-primary' : 'text-white/40'}`}
               onClick={() => setTab(tb.id)}>
@@ -59,6 +83,7 @@ export default function AdminPage() {
           {tab === 'events' && <EventsTab key="events" />}
           {tab === 'overlays' && <OverlaysTab key="overlays" />}
           {tab === 'photos' && <PhotosTab key="photos" />}
+          {tab === 'users' && isSuperAdmin && <UsersTab key="users" />}
         </AnimatePresence>
       </div>
     </div>
@@ -171,7 +196,7 @@ function EventsTab() {
                 <div>
                   <label className={`block text-xs mb-1 ${errors.date ? 'text-red-400' : 'text-white/50'}`}>{he ? 'תאריך' : 'Date'} *</label>
                   <input type="date" value={date} onChange={(e) => { setDate(e.target.value); setErrors((p) => ({ ...p, date: false })); }}
-                    className={`w-full px-3 py-3 rounded-xl bg-white/8 border text-white focus:outline-none text-base ${errors.date ? 'border-red-500' : 'border-white/15 focus:border-primary'}`} />
+                    className={`w-full px-2 py-3 rounded-xl bg-white/8 border text-white focus:outline-none text-sm ${errors.date ? 'border-red-500' : 'border-white/15 focus:border-primary'}`} />
                 </div>
                 <div>
                   <label className="block text-xs text-white/50 mb-1">{he ? 'מקסימום הדפסות' : 'Max Prints'}</label>
@@ -250,73 +275,130 @@ function OverlaysTab() {
   const { locale } = useStore();
   const he = locale === 'he';
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [overlays, setOverlays] = useState<OverlayData[]>([]);
+  const [overlays, setOverlays] = useState<(OverlayData & { eventId?: string | null })[]>([]);
+  const [events, setEvents] = useState<EventData[]>([]);
+  const [selectedEventId, setSelectedEventId] = useState<string>('');
+  const [uploadEventId, setUploadEventId] = useState<string>('');
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const loadOverlays = () => {
-    api.getOverlays().then((data) => { setOverlays(data); setLoading(false); });
+  const loadData = () => {
+    Promise.all([api.getOverlays(), api.getEvents()]).then(([ovs, evs]) => {
+      setOverlays(ovs);
+      setEvents(evs);
+      setLoading(false);
+    });
   };
 
-  useEffect(() => { loadOverlays(); }, []);
+  useEffect(() => { loadData(); }, []);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files) return;
+    if (!files || !uploadEventId) return;
     setUploading(true);
-
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const name = file.name.replace(/\.[^.]+$/, '');
-      await api.uploadOverlay(file, name);
+      await api.uploadOverlay(file, name, uploadEventId);
     }
-
     setUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
-    loadOverlays();
+    loadData();
   };
 
   const handleDeleteOverlay = async (id: string) => {
     const result = await Swal.fire({ icon: 'warning', title: he ? 'למחוק מסגרת?' : 'Delete overlay?', showCancelButton: true, confirmButtonColor: '#D4AF37', cancelButtonColor: '#333', confirmButtonText: he ? 'מחק' : 'Delete', cancelButtonText: he ? 'ביטול' : 'Cancel', background: '#0a0a0a', color: '#fff' });
     if (!result.isConfirmed) return;
     await api.deleteOverlay(id);
-    loadOverlays();
+    loadData();
   };
+
+  const filteredOverlays = selectedEventId
+    ? overlays.filter(o => o.eventId === selectedEventId)
+    : overlays;
 
   if (loading) return <div className="text-center py-10"><span className="text-3xl">⏳</span></div>;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <input ref={fileInputRef} type="file" accept="image/png" multiple className="hidden" onChange={handleUpload} />
-      <button className="btn-glow w-full mb-5" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-        {uploading ? '⏳' : '+'} {he ? 'העלה מסגרות PNG' : 'Upload PNG Overlays'}
-      </button>
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {overlays.map((overlay, i) => (
-          <motion.div key={overlay.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.04 }}
-            className="glass-card overflow-hidden relative">
-            <div className="aspect-[3/4] relative">
-              <div className="absolute inset-0" style={{
-                backgroundImage: 'repeating-conic-gradient(#0a0a0a 0% 25%, #1a1a1a 0% 50%)',
-                backgroundSize: '12px 12px',
-              }} />
-              <img src={overlay.url} alt={overlay.name} className="relative w-full h-full object-contain p-1" />
-            </div>
-            <div className="p-2 flex items-center justify-between">
-              <p className="text-xs font-bold text-white/70 truncate flex-1">{overlay.name}</p>
-              <button className="w-7 h-7 rounded-full bg-red-500/15 text-red-400 flex items-center justify-center text-xs active:bg-red-500/30 flex-shrink-0"
-                onClick={() => handleDeleteOverlay(overlay.id)}>✕</button>
-            </div>
-          </motion.div>
-        ))}
+      {/* Upload section — select event first */}
+      <div className="glass-card p-4 mb-4">
+        <p className="text-xs text-white/50 mb-2">{he ? 'העלה מסגרות לאירוע:' : 'Upload frames for event:'}</p>
+        <div className="flex gap-2">
+          <select
+            value={uploadEventId}
+            onChange={(e) => setUploadEventId(e.target.value)}
+            className="flex-1 px-3 py-2.5 rounded-xl bg-white/8 border border-white/15 text-white text-sm focus:outline-none focus:border-primary"
+          >
+            <option value="">{he ? 'בחר אירוע...' : 'Select event...'}</option>
+            {events.map(ev => (
+              <option key={ev.id} value={ev.id}>{ev.name}</option>
+            ))}
+          </select>
+          <input ref={fileInputRef} type="file" accept="image/png" multiple className="hidden" onChange={handleUpload} />
+          <button
+            className="btn-glow px-4 text-sm"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading || !uploadEventId}
+            style={{ opacity: uploadEventId ? 1 : 0.4 }}
+          >
+            {uploading ? '⏳' : '+'} {he ? 'העלה' : 'Upload'}
+          </button>
+        </div>
       </div>
 
-      {overlays.length === 0 && (
+      {/* Filter by event */}
+      <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+        <button
+          className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${!selectedEventId ? 'bg-primary/20 text-primary' : 'bg-white/5 text-white/40'}`}
+          onClick={() => setSelectedEventId('')}
+        >
+          {he ? 'הכל' : 'All'} ({overlays.length})
+        </button>
+        {events.map(ev => {
+          const count = overlays.filter(o => o.eventId === ev.id).length;
+          return (
+            <button key={ev.id}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${selectedEventId === ev.id ? 'bg-primary/20 text-primary' : 'bg-white/5 text-white/40'}`}
+              onClick={() => setSelectedEventId(ev.id)}
+            >
+              {ev.name} ({count})
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {filteredOverlays.map((overlay, i) => {
+          const eventName = events.find(e => e.id === overlay.eventId)?.name;
+          return (
+            <motion.div key={overlay.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.04 }}
+              className="glass-card overflow-hidden relative">
+              <div className="aspect-[3/4] relative">
+                <div className="absolute inset-0" style={{
+                  backgroundImage: 'repeating-conic-gradient(#0a0a0a 0% 25%, #1a1a1a 0% 50%)',
+                  backgroundSize: '12px 12px',
+                }} />
+                <img src={overlay.url} alt={overlay.name} className="relative w-full h-full object-contain p-1" />
+              </div>
+              <div className="p-2">
+                <p className="text-xs font-bold text-white/70 truncate">{overlay.name}</p>
+                {eventName && <p className="text-[9px] text-primary/50 truncate">{eventName}</p>}
+                <div className="flex justify-end mt-1">
+                  <button className="w-6 h-6 rounded-full bg-red-500/15 text-red-400 flex items-center justify-center text-[10px] active:bg-red-500/30"
+                    onClick={() => handleDeleteOverlay(overlay.id)}>✕</button>
+                </div>
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {filteredOverlays.length === 0 && (
         <div className="glass-card p-10 text-center">
           <span className="text-5xl block mb-3">🖼️</span>
-          <h3 className="text-lg font-bold text-white mb-1">{he ? 'אין מסגרות עדיין' : 'No overlays yet'}</h3>
-          <p className="text-sm text-white/40">{he ? 'העלה קבצי PNG עם רקע שקוף' : 'Upload PNG files with transparent background'}</p>
+          <h3 className="text-lg font-bold text-white mb-1">{he ? 'אין מסגרות' : 'No overlays'}</h3>
+          <p className="text-sm text-white/40">{he ? 'בחר אירוע והעלה קבצי PNG' : 'Select an event and upload PNG files'}</p>
         </div>
       )}
     </motion.div>
@@ -339,10 +421,11 @@ function PhotosTab() {
   const loadEvents = async () => {
     const evs = await api.getEvents();
     setEvents(evs);
+    // Get counts per event without loading all photo data
     const counts: Record<string, number> = {};
-    const allPhotos = await api.getPhotos();
-    for (const p of allPhotos) {
-      counts[p.eventId] = (counts[p.eventId] || 0) + 1;
+    for (const ev of evs) {
+      const photos = await api.getPhotos(ev.id);
+      counts[ev.id] = photos.length;
     }
     setPhotoCounts(counts);
     setLoading(false);
@@ -423,10 +506,11 @@ function PhotosTab() {
   const handleDownloadAll = async () => {
     for (const photo of photos) {
       const link = document.createElement('a');
-      link.href = photo.photoUrl;
+      link.href = api.getPhotoImageUrl(photo.id);
       link.download = `photo_${photo.id.slice(0, 8)}.jpg`;
+      link.target = '_blank';
       link.click();
-      await new Promise((r) => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, 500));
     }
   };
 
@@ -461,7 +545,7 @@ function PhotosTab() {
               {pendingReview.map((photo) => (
                 <div key={photo.id} className="glass-card overflow-hidden border border-yellow-500/30">
                   <div className="relative bg-black">
-                    <img src={photo.photoUrl} alt="" className="w-full aspect-[3/4] object-cover" />
+                    <img src={api.getPhotoImageUrl(photo.id)} alt="" className="w-full aspect-[3/4] object-cover" loading="lazy" />
                     <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded-full bg-yellow-500/80 text-[8px] font-bold text-black">
                       {photo.moderationReason === 'suspicious_content' ? '🔍' : photo.moderationReason === 'low_face_confidence' ? '👤?' : '⚠️'}
                     </div>
@@ -522,14 +606,7 @@ function PhotosTab() {
                 className={`glass-card overflow-hidden transition-all ${isSelected ? 'ring-2 ring-primary' : ''}`}>
                 {/* Selectable photo */}
                 <div className="relative bg-black cursor-pointer" onClick={() => toggleSelect(photo.id)}>
-                  {photo.overlay ? (
-                    <div className="relative">
-                      <img src={photo.overlay.url} alt="" className="relative w-full h-auto block z-10 pointer-events-none" />
-                      <img src={photo.photoUrl} alt="" className="absolute inset-0 w-full h-full object-cover z-0" />
-                    </div>
-                  ) : (
-                    <img src={photo.photoUrl} alt="" className="w-full aspect-[3/4] object-cover" />
-                  )}
+                    <img src={api.getPhotoImageUrl(photo.id)} alt="" className="w-full aspect-[3/4] object-cover" loading="lazy" />
                   {/* Selection checkbox */}
                   <div className={`absolute top-2 right-2 w-6 h-6 rounded-full border-2 flex items-center justify-center z-20 ${isSelected ? 'bg-primary border-primary' : 'border-white/50 bg-black/30'}`}>
                     {isSelected && <span className="text-white text-xs font-bold">✓</span>}
@@ -613,6 +690,93 @@ function PhotosTab() {
 }
 
 // ===================== QR CODE =====================
+// ===================== USERS TAB (Super Admin) =====================
+function UsersTab() {
+  const { locale } = useStore();
+  const he = locale === 'he';
+  const [users, setUsers] = useState<UserData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.getUsers().then((data: UserData[]) => { setUsers(data); setLoading(false); }).catch(() => setLoading(false));
+  }, []);
+
+  const toggleActive = async (user: UserData) => {
+    await api.updateUser(user.id, { active: !user.active });
+    setUsers(users.map(u => u.id === user.id ? { ...u, active: !u.active } : u));
+  };
+
+  const toggleRole = async (user: UserData) => {
+    const newRole = user.role === 'super_admin' ? 'account_manager' : 'super_admin';
+    await api.updateUser(user.id, { role: newRole });
+    setUsers(users.map(u => u.id === user.id ? { ...u, role: newRole } : u));
+  };
+
+  if (loading) {
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-center py-12">
+        <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+          className="w-8 h-8 rounded-full border-2 border-transparent" style={{ borderTopColor: '#D4AF37', borderRightColor: '#D4AF37' }} />
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+      <h2 className="text-lg font-bold text-white mb-4">
+        {he ? 'ניהול משתמשים' : 'User Management'}
+        <span className="text-xs text-white/30 font-normal ml-2">({users.length})</span>
+      </h2>
+
+      <div className="space-y-3">
+        {users.map((user) => (
+          <div key={user.id} className="glass-card p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-bold text-white truncate">{user.name}</h3>
+                <p className="text-xs text-white/40 truncate">{user.email}</p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${
+                  user.role === 'super_admin'
+                    ? 'bg-primary/20 text-[#D4AF37]'
+                    : 'bg-white/8 text-white/50'
+                }`}>
+                  {user.role === 'super_admin' ? (he ? 'מנהל אתר' : 'Super Admin') : (he ? 'מנהל חשבון' : 'Account Mgr')}
+                </span>
+                <span className={`w-2 h-2 rounded-full ${user.active ? 'bg-green-500' : 'bg-red-500'}`} />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between text-[10px] text-white/30">
+              <div className="flex items-center gap-3">
+                {user.phone && <span>📱 {user.phone}</span>}
+                <span>📅 {new Date(user.createdAt).toLocaleDateString()}</span>
+                <span>🎉 {user._count.events} {he ? 'אירועים' : 'events'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => toggleRole(user)} className="px-2 py-1 rounded text-[10px] bg-white/5 text-white/40 hover:bg-white/10 transition-colors">
+                  {he ? 'שנה תפקיד' : 'Change Role'}
+                </button>
+                <button onClick={() => toggleActive(user)}
+                  className={`px-2 py-1 rounded text-[10px] transition-colors ${user.active ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20' : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'}`}>
+                  {user.active ? (he ? 'השבת' : 'Disable') : (he ? 'הפעל' : 'Enable')}
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {users.length === 0 && (
+          <div className="text-center py-8 text-white/30 text-sm">
+            {he ? 'אין משתמשים רשומים' : 'No registered users'}
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
 function QRCodeDisplay({ eventId }: { eventId: string }) {
   const [qrSvg, setQrSvg] = useState<string>('');
   useEffect(() => {

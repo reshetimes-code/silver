@@ -1,9 +1,92 @@
 const BASE = '';
 
+function authHeaders(): Record<string, string> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('auth-token') : null;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export const api = {
-  // Events
+  // ===== Auth =====
+  async login(email: string, password: string) {
+    const res = await fetch(`${BASE}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Login failed');
+    }
+    const data = await res.json();
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('auth-token', data.token);
+      localStorage.setItem('auth-user', JSON.stringify(data.user));
+    }
+    return data;
+  },
+
+  async register(data: { email: string; password: string; name: string; phone?: string }) {
+    const res = await fetch(`${BASE}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Registration failed');
+    }
+    const result = await res.json();
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('auth-token', result.token);
+      localStorage.setItem('auth-user', JSON.stringify(result.user));
+    }
+    return result;
+  },
+
+  async getMe() {
+    const res = await fetch(`${BASE}/api/auth/me`, { headers: authHeaders() });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.user;
+  },
+
+  logout() {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('auth-token');
+      localStorage.removeItem('auth-user');
+      sessionStorage.removeItem('admin-auth');
+    }
+  },
+
+  getStoredUser() {
+    if (typeof window === 'undefined') return null;
+    const raw = localStorage.getItem('auth-user');
+    return raw ? JSON.parse(raw) : null;
+  },
+
+  getStoredToken() {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('auth-token');
+  },
+
+  // ===== Users (super admin) =====
+  async getUsers() {
+    const res = await fetch(`${BASE}/api/users`, { headers: authHeaders() });
+    return res.json();
+  },
+
+  async updateUser(id: string, data: Record<string, unknown>) {
+    const res = await fetch(`${BASE}/api/users`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ id, ...data }),
+    });
+    return res.json();
+  },
+
+  // ===== Events =====
   async getEvents() {
-    const res = await fetch(`${BASE}/api/events`);
+    const res = await fetch(`${BASE}/api/events`, { headers: authHeaders() });
     return res.json();
   },
   async getEvent(id: string) {
@@ -12,26 +95,36 @@ export const api = {
     return res.json();
   },
   async createEvent(data: { name: string; date: string; maxPrintsPerDevice: number }) {
-    const res = await fetch(`${BASE}/api/events`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    const res = await fetch(`${BASE}/api/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(data),
+    });
     return res.json();
   },
   async updateEvent(id: string, data: Record<string, unknown>) {
-    const res = await fetch(`${BASE}/api/events/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    const res = await fetch(`${BASE}/api/events/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(data),
+    });
     return res.json();
   },
   async deleteEvent(id: string) {
-    await fetch(`${BASE}/api/events/${id}`, { method: 'DELETE' });
+    await fetch(`${BASE}/api/events/${id}`, { method: 'DELETE', headers: authHeaders() });
   },
 
-  // Overlays
-  async getOverlays() {
-    const res = await fetch(`${BASE}/api/overlays`);
+  // ===== Overlays =====
+  async getOverlays(eventId?: string) {
+    const url = eventId ? `${BASE}/api/overlays?eventId=${eventId}` : `${BASE}/api/overlays`;
+    const res = await fetch(url);
     return res.json();
   },
-  async uploadOverlay(file: File, name: string) {
+  async uploadOverlay(file: File, name: string, eventId?: string) {
     const formData = new FormData();
     formData.append('overlay', file);
     formData.append('name', name);
+    if (eventId) formData.append('eventId', eventId);
     const res = await fetch(`${BASE}/api/upload-overlay`, { method: 'POST', body: formData });
     return res.json();
   },
@@ -39,13 +132,17 @@ export const api = {
     await fetch(`${BASE}/api/overlays/${id}`, { method: 'DELETE' });
   },
 
-  // Photos
+  // ===== Photos =====
   async getPhotos(eventId?: string) {
     const res = await fetch(`${BASE}/api/photos?eventId=${eventId || 'all'}`);
     return res.json();
   },
   async submitPhoto(data: { eventId: string; overlayId: string; image: string; deviceId: string; phoneNumber: string }) {
-    const res = await fetch(`${BASE}/api/photos`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    const res = await fetch(`${BASE}/api/photos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
     if (!res.ok) {
       const err = await res.json();
       return { error: err.error, reason: err.reason };
@@ -53,7 +150,11 @@ export const api = {
     return res.json();
   },
   async updatePhoto(id: string, data: Record<string, unknown>) {
-    const res = await fetch(`${BASE}/api/photos/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    const res = await fetch(`${BASE}/api/photos/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
     return res.json();
   },
   async deletePhoto(id: string) {
@@ -76,7 +177,7 @@ export const api = {
     return res.json();
   },
 
-  // Photo image URL (for sharing)
+  // Photo image URL
   getPhotoImageUrl(photoId: string) {
     return `${typeof window !== 'undefined' ? window.location.origin : ''}/api/photos/${photoId}/image`;
   },

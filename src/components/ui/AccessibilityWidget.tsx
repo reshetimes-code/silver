@@ -53,8 +53,7 @@ export default function AccessibilityWidget() {
       {/* Accessibility Button */}
       <motion.button
         onClick={() => setOpen(!open)}
-        className="fixed bottom-4 right-4 z-50 w-11 h-11 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-white flex items-center justify-center active:scale-90 transition-transform"
-        style={{ paddingBottom: 'var(--safe-bottom, 0px)' }}
+        className="fixed bottom-20 right-3 z-40 w-9 h-9 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white flex items-center justify-center active:scale-90 transition-transform"
         whileTap={{ scale: 0.85 }}
         aria-label="Accessibility settings"
       >

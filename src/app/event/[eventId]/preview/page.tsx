@@ -46,7 +46,7 @@ export default function PreviewPage() {
     const stored = sessionStorage.getItem('photobooth-captured-image');
     if (stored) setImage(stored);
 
-    Promise.all([api.getEvent(eventId), api.getOverlays()]).then(([ev, ovs]) => {
+    Promise.all([api.getEvent(eventId), api.getOverlays(eventId)]).then(([ev, ovs]) => {
       setEvent(ev);
       setOverlays(ovs);
       setLoading(false);

@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useStore } from '@/lib/store';
 import { useHydrated } from '@/lib/use-hydrated';
 import Logo from '@/components/ui/Logo';
+import LanguageToggle from '@/components/ui/LanguageToggle';
 import ParticleBackground from '@/components/ui/ParticleBackground';
 import HeroSlider from '@/components/ui/HeroSlider';
 import BottomNav from '@/components/ui/BottomNav';
@@ -114,143 +114,17 @@ const fadeUp = {
 
 export default function LandingPage() {
   const hydrated = useHydrated();
-  const { locale, toggleLocale } = useStore();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [loggedIn, setLoggedIn] = useState(false);
-
-  // Check if already logged in
-  useState(() => {
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('auth-token');
-      if (token) setLoggedIn(true);
-    }
-  });
+  const { locale } = useStore();
 
   if (!hydrated) return null;
 
   const isRtl = locale === 'he';
-  const he = locale === 'he';
   const c = content[locale];
 
   return (
     <div className="min-h-dvh relative bg-black pb-24" dir={isRtl ? 'rtl' : 'ltr'}>
       <ParticleBackground />
-
-      {/* Hamburger button — top right */}
-      <button
-        onClick={() => setMenuOpen(true)}
-        className="fixed top-4 right-4 z-50 w-10 h-10 rounded-xl bg-black/50 backdrop-blur-md border border-white/15 flex flex-col items-center justify-center gap-1.5 active:scale-90 transition-transform"
-      >
-        <span className="w-5 h-[2px] block" style={{ background: '#D4AF37' }} />
-        <span className="w-4 h-[2px] block" style={{ background: '#D4AF37' }} />
-        <span className="w-5 h-[2px] block" style={{ background: '#D4AF37' }} />
-      </button>
-
-      {/* Sidebar Menu */}
-      <AnimatePresence>
-        {menuOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 z-50"
-              onClick={() => setMenuOpen(false)}
-            />
-            <motion.div
-              initial={{ x: isRtl ? -300 : 300 }}
-              animate={{ x: 0 }}
-              exit={{ x: isRtl ? -300 : 300 }}
-              transition={{ type: 'spring', damping: 25 }}
-              className={`fixed top-0 ${isRtl ? 'left-0' : 'right-0'} w-72 h-full z-50 overflow-y-auto`}
-              style={{
-                background: 'rgba(10,10,10,0.97)',
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
-                borderLeft: isRtl ? 'none' : '1px solid rgba(212,175,55,0.1)',
-                borderRight: isRtl ? '1px solid rgba(212,175,55,0.1)' : 'none',
-              }}
-            >
-              <div className="p-6">
-                {/* Close */}
-                <button onClick={() => setMenuOpen(false)}
-                  className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/60 mb-6">
-                  ✕
-                </button>
-
-                {/* Logo */}
-                <div className="mb-6">
-                  <Logo size="md" animate={false} />
-                </div>
-
-                <nav className="space-y-1">
-                  {!loggedIn ? (
-                    <Link href="/login" onClick={() => setMenuOpen(false)}
-                      className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-white/70 hover:bg-white/5 active:bg-white/10 transition-colors">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="1.5">
-                        <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4" /><polyline points="10 17 15 12 10 7" />
-                        <line x1="15" y1="12" x2="3" y2="12" />
-                      </svg>
-                      {he ? 'התחברות / הרשמה' : 'Login / Register'}
-                    </Link>
-                  ) : (
-                    <>
-                      <Link href="/dashboard" onClick={() => setMenuOpen(false)}
-                        className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-white/70 hover:bg-white/5 active:bg-white/10 transition-colors">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="1.5">
-                          <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                          <polyline points="9 22 9 12 15 12 15 22" />
-                        </svg>
-                        {he ? 'האירועים שלי' : 'My Events'}
-                      </Link>
-
-                      <Link href="/admin" onClick={() => setMenuOpen(false)}
-                        className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-white/70 hover:bg-white/5 active:bg-white/10 transition-colors">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="1.5">
-                          <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
-                          <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
-                        </svg>
-                        {he ? 'לוח בקרה (מנהל)' : 'Admin Panel'}
-                      </Link>
-
-                      <button onClick={() => {
-                        localStorage.removeItem('auth-token');
-                        localStorage.removeItem('auth-user');
-                        setLoggedIn(false);
-                        setMenuOpen(false);
-                      }}
-                        className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-red-400/70 hover:bg-red-500/5 active:bg-red-500/10 transition-colors">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                          <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
-                          <polyline points="16 17 21 12 16 7" />
-                          <line x1="21" y1="12" x2="9" y2="12" />
-                        </svg>
-                        {he ? 'התנתק' : 'Logout'}
-                      </button>
-                    </>
-                  )}
-
-                  <button onClick={() => { toggleLocale(); setMenuOpen(false); }}
-                    className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-white/70 hover:bg-white/5 active:bg-white/10 transition-colors">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="1.5">
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="2" y1="12" x2="22" y2="12" />
-                      <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
-                    </svg>
-                    {he ? 'English' : 'עברית'}
-                  </button>
-
-                  <Link href="/#contact" onClick={() => setMenuOpen(false)}
-                    className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-white/70 hover:bg-white/5 active:bg-white/10 transition-colors">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="1.5">
-                      <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
-                    </svg>
-                    {he ? 'צרו קשר' : 'Contact Us'}
-                  </Link>
-                </nav>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      <LanguageToggle />
 
       {/* ===== HERO: Slider with Logo overlay ===== */}
       <div className="relative">
@@ -373,7 +247,7 @@ export default function LandingPage() {
         <motion.div {...fadeUp} className="glass-card p-8 max-w-sm mx-auto">
           <h2 className="text-xl font-bold text-white mb-2">{c.cta.title}</h2>
           <p className="text-xs text-white/40 mb-5">{c.cta.subtitle}</p>
-          <Link href="/login">
+          <Link href="/admin">
             <button className="btn-glow w-full">{c.cta.button}</button>
           </Link>
         </motion.div>

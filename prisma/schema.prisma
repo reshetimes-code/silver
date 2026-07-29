@@ -7,23 +7,48 @@ datasource db {
   provider = "postgresql"
 }
 
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         String   @default("account_manager") // super_admin | account_manager
+  active       Boolean  @default(true)
+  phone        String   @default("")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  events       Event[]
+
+  @@index([email])
+  @@index([role])
+}
+
 model Event {
   id                 String     @id @default(uuid())
   name               String
   date               String
   maxPrintsPerDevice Int        @default(5)
   active             Boolean    @default(true)
+  ownerId            String?
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
   photos             Photo[]
+  overlays           Overlay[]
+  owner              User?      @relation(fields: [ownerId], references: [id])
+
+  @@index([ownerId])
 }
 
 model Overlay {
   id        String   @id @default(uuid())
   name      String
   url       String
+  eventId   String?
   createdAt DateTime @default(now())
   photos    Photo[]
+  event     Event?   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
 }
 
 model Photo {

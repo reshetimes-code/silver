@@ -48,7 +48,7 @@ export default function RootLayout({
     >
       <head>
         <meta name="mobile-web-app-capable" content="yes" />
-        <link rel="apple-touch-icon" href="/logo.png" />
+        <link rel="apple-touch-icon" href="/logo_transperent.png" />
         <script dangerouslySetInnerHTML={{ __html: `
           (function(){function s(){document.documentElement.style.setProperty('--vh',window.innerHeight/100+'px')}
           s();window.addEventListener('resize',s);window.addEventListener('orientationchange',function(){setTimeout(s,150)})})();

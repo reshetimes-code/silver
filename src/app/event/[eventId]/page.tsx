@@ -48,7 +48,7 @@ export default function CapturePhotoPage() {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [phoneInput, setPhoneInput] = useState('');
   const [phoneError, setPhoneError] = useState(false);
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1');
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('9:16');
   const webcamRef = useRef<Webcam>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -234,7 +234,10 @@ export default function CapturePhotoPage() {
           className="glass-card p-8 text-center max-w-sm relative z-10">
           <span className="text-5xl block mb-4">🚫</span>
           <h2 className="text-xl font-bold text-white mb-3">{t(locale, 'noPrintsLeft')}</h2>
-          <p className="text-sm text-white/50">{t(locale, 'maxPrintsReached')}</p>
+          <p className="text-sm text-white/50 mb-5">{t(locale, 'maxPrintsReached')}</p>
+          <button className="btn-secondary w-full" onClick={() => router.push('/')}>
+            {he ? 'חזרה לדף הבית' : 'Back to Home'}
+          </button>
         </motion.div>
       </div>
     );
@@ -255,12 +258,37 @@ export default function CapturePhotoPage() {
           className="glass-card p-8 w-full max-w-sm relative z-10 text-center"
         >
           {/* Logo */}
-          <div className="mb-4">
+          <div className="mb-3">
             <Logo size="lg" />
           </div>
 
-          <h2 className="text-2xl font-bold text-white mb-3">{t(locale, 'enterPhone')}</h2>
-          <p className="text-base text-white/40 mb-6">{t(locale, 'phoneRequired')}</p>
+          {/* Personal welcome */}
+          <motion.h1
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="text-lg font-bold text-gold mb-1"
+          >
+            {he ? 'ברוכים הבאים ל' : 'Welcome to'}
+          </motion.h1>
+          <motion.h2
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="text-2xl font-black text-white mb-1"
+          >
+            {event.name}
+          </motion.h2>
+          <motion.div
+            initial={{ scaleX: 0 }}
+            animate={{ scaleX: 1 }}
+            transition={{ delay: 0.6, duration: 0.5 }}
+            className="w-20 h-[1px] mx-auto mb-4"
+            style={{ background: 'linear-gradient(90deg, transparent, #D4AF37, transparent)' }}
+          />
+
+          <p className="text-sm text-white/40 mb-4">{t(locale, 'enterPhone')}</p>
+          <p className="text-xs text-white/25 mb-4">{t(locale, 'phoneRequired')}</p>
 
           <input
             type="tel"
@@ -310,7 +338,7 @@ export default function CapturePhotoPage() {
       {/* App Header */}
       <div className="app-header flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
-          <Logo size="md" animate={false} />
+          <Logo size="lg" animate={false} />
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <motion.div

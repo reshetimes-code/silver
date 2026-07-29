@@ -17,8 +17,10 @@ export async function POST(request: NextRequest) {
     const mimeType = file.type || 'image/png';
     const dataUrl = `data:${mimeType};base64,${base64}`;
 
+    const eventId = formData.get('eventId') as string | null;
+
     const overlay = await prisma.overlay.create({
-      data: { name, url: dataUrl },
+      data: { name, url: dataUrl, eventId: eventId || null },
     });
 
     return NextResponse.json({ success: true, overlay });
