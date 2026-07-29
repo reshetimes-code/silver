@@ -25,12 +25,8 @@ interface EventData {
 const TIMER_OPTIONS = [0, 3, 5, 10] as const;
 type TimerValue = typeof TIMER_OPTIONS[number];
 
-type AspectRatio = '1:1' | '9:16';
-
-const ASPECT_RATIOS: { value: AspectRatio; label: string; labelHe: string; icon: string; width: number; height: number }[] = [
-  { value: '1:1', label: 'Square', labelHe: 'מרובע', icon: '⬜', width: 2160, height: 2160 },
-  { value: '9:16', label: 'TikTok', labelHe: 'טיקטוק', icon: '📱', width: 2160, height: 3840 },
-];
+const PHOTO_WIDTH = 2160;
+const PHOTO_HEIGHT = 3840;
 
 export default function CapturePhotoPage() {
   const params = useParams();
@@ -48,7 +44,7 @@ export default function CapturePhotoPage() {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [phoneInput, setPhoneInput] = useState('');
   const [phoneError, setPhoneError] = useState(false);
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('9:16');
+  // Fixed 9:16 aspect ratio
   const webcamRef = useRef<Webcam>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -56,7 +52,7 @@ export default function CapturePhotoPage() {
 
   const isRtl = locale === 'he';
   const he = locale === 'he';
-  const currentAR = ASPECT_RATIOS.find(a => a.value === aspectRatio)!;
+  // Fixed 9:16 ratio
 
   useEffect(() => {
     api.getEvent(eventId).then((data) => {
@@ -103,31 +99,28 @@ export default function CapturePhotoPage() {
         const srcH = img.height;
 
         let cropW: number, cropH: number, cropX: number, cropY: number;
-        const targetRatio = currentAR.width / currentAR.height;
-        const srcRatio = srcW / srcH;
+        const targetRatio = PHOTO_WIDTH / PHOTO_HEIGHT; // 9:16
 
-        if (srcRatio > targetRatio) {
-          // Source is wider — crop sides
+        if (srcW / srcH > targetRatio) {
           cropH = srcH;
-          cropW = srcH * targetRatio;
-          cropX = (srcW - cropW) / 2;
+          cropW = Math.round(srcH * targetRatio);
+          cropX = Math.round((srcW - cropW) / 2);
           cropY = 0;
         } else {
-          // Source is taller — crop top/bottom
           cropW = srcW;
-          cropH = srcW / targetRatio;
+          cropH = Math.round(srcW / targetRatio);
           cropX = 0;
-          cropY = (srcH - cropH) / 2;
+          cropY = Math.round((srcH - cropH) / 2);
         }
 
-        canvas.width = currentAR.width;
-        canvas.height = currentAR.height;
-        ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, currentAR.width, currentAR.height);
+        canvas.width = PHOTO_WIDTH;
+        canvas.height = PHOTO_HEIGHT;
+        ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, PHOTO_WIDTH, PHOTO_HEIGHT);
         resolve(canvas.toDataURL('image/jpeg', 1.0));
       };
       img.src = imageSrc;
     });
-  }, [currentAR]);
+  }, []);
 
   const captureNow = useCallback(async () => {
     // Capture at FULL video resolution, not display size
@@ -260,8 +253,7 @@ export default function CapturePhotoPage() {
     );
   }
 
-  // Aspect ratio CSS for viewfinder clipping
-  const viewfinderAspect = aspectRatio === '9:16' ? 'aspect-[9/16]' : 'aspect-square';
+  // Fixed 9:16 viewfinder
 
   // ===== PHONE ENTRY SCREEN =====
   if (mode === 'phone') {
@@ -398,31 +390,6 @@ export default function CapturePhotoPage() {
                 <Logo size="lg" />
               </div>
 
-              {/* Aspect Ratio Selector */}
-              <div className="w-full">
-                <p className="text-xs text-white/30 text-center mb-2 tracking-wider uppercase">
-                  {he ? 'גודל תמונה' : 'Photo Size'}
-                </p>
-                <div className="flex items-center justify-center gap-2">
-                  {ASPECT_RATIOS.map((ar) => (
-                    <motion.button
-                      key={ar.value}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => setAspectRatio(ar.value)}
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                        aspectRatio === ar.value
-                          ? 'bg-primary/20 text-[#F4E5B0] border border-primary/40'
-                          : 'bg-white/5 text-white/40 border border-white/5 active:bg-white/10'
-                      }`}
-                    >
-                      <span className="text-base">{ar.icon}</span>
-                      <span>{he ? ar.labelHe : ar.label}</span>
-                      <span className="text-[10px] opacity-50">{ar.value}</span>
-                    </motion.button>
-                  ))}
-                </div>
-              </div>
-
               <motion.button className="btn-glow w-full text-lg" whileTap={{ scale: 0.96 }} onClick={() => setMode('camera')}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <rect x="2" y="6" width="20" height="14" rx="3" />
@@ -445,68 +412,52 @@ export default function CapturePhotoPage() {
             </motion.div>
           )}
 
-          {/* ===== CAMERA VIEW ===== */}
+          {/* ===== CAMERA VIEW — FULLSCREEN ===== */}
           {mode === 'camera' && !capturedImage && (
             <motion.div key="camera" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="w-full max-w-lg flex flex-col items-center gap-3">
+              className="fixed inset-0 z-50 bg-black flex flex-col">
 
-              {/* Top controls: Timer + Aspect Ratio */}
-              <div className="flex items-center justify-between w-full px-1" style={{ opacity: countdown !== null ? 0.4 : 1, pointerEvents: countdown !== null ? 'none' : 'auto' }}>
-                {/* Timer */}
-                <div className="flex items-center gap-1.5">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5">
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M12 6v6l4 2" strokeLinecap="round" />
-                  </svg>
-                  {TIMER_OPTIONS.map((sec) => (
-                    <button key={sec}
-                      className={`px-2.5 py-1 rounded-full text-xs font-bold transition-all ${timerSeconds === sec
-                        ? 'bg-primary text-black'
-                        : 'bg-white/10 text-white/50 active:bg-white/20'}`}
-                      onClick={() => { setTimerSeconds(sec); cancelTimer(); }}>
-                      {sec === 0 ? (he ? 'ללא' : 'Off') : `${sec}s`}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Aspect ratio mini toggle */}
-                <div className="flex items-center gap-1 bg-white/5 rounded-full p-0.5">
-                  {ASPECT_RATIOS.map((ar) => (
-                    <button key={ar.value}
-                      className={`px-2 py-1 rounded-full text-[10px] font-bold transition-all ${
-                        aspectRatio === ar.value ? 'bg-primary/30 text-[#F4E5B0]' : 'text-white/30'
-                      }`}
-                      onClick={() => setAspectRatio(ar.value)}>
-                      {ar.value}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Viewfinder with aspect ratio */}
-              <div className={`camera-viewfinder w-full relative overflow-hidden ${viewfinderAspect}`}
-                style={{ maxHeight: aspectRatio === '9:16' ? '65vh' : '80vw' }}>
-                <Webcam key={`${facingMode}-${aspectRatio}`} ref={webcamRef} audio={false}
+              {/* Full-screen viewfinder */}
+              <div className="flex-1 relative overflow-hidden">
+                <Webcam key={facingMode} ref={webcamRef} audio={false}
                   screenshotFormat="image/jpeg" screenshotQuality={1}
                   videoConstraints={{ facingMode, width: { ideal: 1920, min: 1280 }, height: { ideal: 1920, min: 1280 } }}
-                  className="w-full h-full object-cover rounded-2xl"
+                  className="absolute inset-0 w-full h-full object-cover"
                   mirrored={facingMode === 'user'}
                 />
+
+                {/* Viewfinder corners */}
                 <div className="viewfinder-corner tl" /><div className="viewfinder-corner tr" />
                 <div className="viewfinder-corner bl" /><div className="viewfinder-corner br" />
 
-                {/* Aspect ratio indicator */}
-                <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 px-2 py-0.5 rounded-full text-[9px] font-bold"
-                  style={{ background: 'rgba(0,0,0,0.5)', color: 'rgba(212,175,55,0.6)', backdropFilter: 'blur(4px)' }}>
-                  {aspectRatio === '1:1' ? (he ? 'מרובע' : 'Square') : 'TikTok'} {aspectRatio}
+                {/* Top overlay — timer + aspect ratio */}
+                <div className="absolute top-0 left-0 right-0 z-20 p-3 flex items-center justify-between"
+                  style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.6) 0%, transparent 100%)', opacity: countdown !== null ? 0.4 : 1, pointerEvents: countdown !== null ? 'none' : 'auto' }}>
+                  {/* Timer */}
+                  <div className="flex items-center gap-1.5">
+                    {TIMER_OPTIONS.map((sec) => (
+                      <button key={sec}
+                        className={`px-2.5 py-1.5 rounded-full text-xs font-bold transition-all ${timerSeconds === sec
+                          ? 'bg-primary text-black'
+                          : 'bg-black/40 text-white/60 active:bg-white/20'}`}
+                        onClick={() => { setTimerSeconds(sec); cancelTimer(); }}>
+                        {sec === 0 ? (he ? 'ללא' : 'Off') : `${sec}s`}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Prints remaining */}
+                  <div className="px-2.5 py-1.5 rounded-full text-xs font-bold bg-black/40 text-[#D4AF37]">
+                    {printsRemaining} {he ? 'נותרו' : 'left'}
+                  </div>
                 </div>
 
                 {/* Countdown overlay */}
                 <AnimatePresence>
                   {countdown !== null && (
                     <motion.div
-                      className="absolute inset-0 flex items-center justify-center rounded-2xl z-10"
-                      style={{ background: 'rgba(0,0,0,0.5)' }}
+                      className="absolute inset-0 flex items-center justify-center z-30"
+                      style={{ background: 'rgba(0,0,0,0.4)' }}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
@@ -526,8 +477,9 @@ export default function CapturePhotoPage() {
                 </AnimatePresence>
               </div>
 
-              {/* Bottom Controls */}
-              <div className="flex items-center justify-center gap-6 py-2">
+              {/* Bottom Controls — fixed at bottom */}
+              <div className="relative z-20 flex items-center justify-center gap-8 py-5 px-4"
+                style={{ background: 'linear-gradient(0deg, rgba(0,0,0,0.8) 0%, transparent 100%)' }}>
                 {/* Close */}
                 <motion.button
                   className="control-btn"
@@ -581,19 +533,11 @@ export default function CapturePhotoPage() {
           {capturedImage && (
             <motion.div key="captured" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
               className="w-full max-w-sm flex flex-col items-center gap-4">
-              <div className={`camera-viewfinder w-full overflow-hidden ${viewfinderAspect}`}
-                style={{ maxHeight: aspectRatio === '9:16' ? '60vh' : '80vw' }}>
+              <div className="camera-viewfinder w-full overflow-hidden aspect-[9/16]"
+                style={{ maxHeight: '65vh' }}>
                 <img src={capturedImage} alt="Captured" className="w-full h-full object-cover rounded-2xl" />
                 <div className="viewfinder-corner tl" /><div className="viewfinder-corner tr" />
                 <div className="viewfinder-corner bl" /><div className="viewfinder-corner br" />
-              </div>
-
-              {/* Aspect ratio badge */}
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold"
-                  style={{ background: 'rgba(212,175,55,0.1)', color: '#D4AF37', border: '1px solid rgba(212,175,55,0.15)' }}>
-                  {aspectRatio === '1:1' ? (he ? 'מרובע' : 'Square') : 'TikTok'} {aspectRatio}
-                </span>
               </div>
 
               <div className="flex items-center gap-3 w-full">
