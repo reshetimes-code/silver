@@ -92,6 +92,8 @@ export default function CapturePhotoPage() {
     };
   }, [mode]);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [timerSeconds, setTimerSeconds] = useState<TimerValue>(0);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [phoneInput, setPhoneInput] = useState('');
@@ -211,6 +213,14 @@ export default function CapturePhotoPage() {
       if (fallback) { setRawImage(fallback); setMode('crop'); }
     }
   }, [facingMode]);
+
+  // Enumerate video devices after camera permission is granted
+  const handleWebcamReady = useCallback(() => {
+    navigator.mediaDevices.enumerateDevices().then(devices => {
+      const videoInputs = devices.filter(d => d.kind === 'videoinput');
+      setVideoDevices(videoInputs);
+    }).catch(() => {});
+  }, []);
 
   const cancelTimer = useCallback(() => {
     if (countdownRef.current) {
@@ -555,11 +565,15 @@ export default function CapturePhotoPage() {
       {mode === 'camera' && !capturedImage && (
         <div className="fixed inset-0 z-[999] bg-black flex flex-col" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
           <div className="flex-1 relative overflow-hidden">
-            <Webcam key={facingMode} ref={webcamRef} audio={false}
+            <Webcam key={selectedDeviceId || facingMode} ref={webcamRef} audio={false}
               screenshotFormat="image/jpeg" screenshotQuality={1}
-              videoConstraints={{ facingMode, width: { ideal: 1080, min: 720 }, height: { ideal: 1920, min: 1280 }, aspectRatio: 9 / 16 }}
+              videoConstraints={selectedDeviceId
+                ? { deviceId: { exact: selectedDeviceId }, width: { ideal: 1080, min: 720 }, height: { ideal: 1920, min: 1280 }, aspectRatio: 9 / 16 }
+                : { facingMode, width: { ideal: 1080, min: 720 }, height: { ideal: 1920, min: 1280 }, aspectRatio: 9 / 16 }
+              }
               className="absolute inset-0 w-full h-full object-cover"
-              mirrored={facingMode === 'user'}
+              mirrored={facingMode === 'user' && !selectedDeviceId}
+              onUserMedia={handleWebcamReady}
             />
             <div className="viewfinder-corner tl" /><div className="viewfinder-corner tr" />
             <div className="viewfinder-corner bl" /><div className="viewfinder-corner br" />
@@ -589,6 +603,35 @@ export default function CapturePhotoPage() {
             )}
           </div>
 
+          {/* Lens selector — shows when multiple back cameras available */}
+          {facingMode === 'environment' && videoDevices.filter(d => !d.label.toLowerCase().includes('front')).length > 1 && (
+            <div className="flex items-center justify-center gap-2 py-2 bg-black">
+              {videoDevices
+                .filter(d => !d.label.toLowerCase().includes('front'))
+                .map((device, i) => {
+                  const label = device.label.toLowerCase();
+                  const zoomLabel = label.includes('ultra') || label.includes('wide') ? '0.5×'
+                    : label.includes('tele') ? '2×'
+                    : `${i + 1}×`;
+                  const isActive = selectedDeviceId === device.deviceId;
+                  return (
+                    <button
+                      key={device.deviceId}
+                      onClick={() => setSelectedDeviceId(device.deviceId)}
+                      className="px-3 py-1.5 rounded-full text-xs font-bold transition-all"
+                      style={{
+                        background: isActive ? 'rgba(255,200,0,0.9)' : 'rgba(0,0,0,0.6)',
+                        color: isActive ? '#000' : '#FFD700',
+                        border: '1px solid rgba(255,200,0,0.5)',
+                      }}
+                    >
+                      {zoomLabel}
+                    </button>
+                  );
+                })}
+            </div>
+          )}
+
           {/* Bottom controls */}
           <div className="flex items-center justify-center gap-8 py-5 px-4 bg-black">
             <button className="control-btn" onClick={() => { cancelTimer(); setMode('choose'); }}>
@@ -605,7 +648,7 @@ export default function CapturePhotoPage() {
               </button>
             )}
             <button className="control-btn" disabled={countdown !== null} style={{ opacity: countdown !== null ? 0.4 : 1 }}
-              onClick={() => setFacingMode((f) => f === 'user' ? 'environment' : 'user')}>
+              onClick={() => { setSelectedDeviceId(null); setFacingMode((f) => f === 'user' ? 'environment' : 'user'); }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M1 4v6h6M23 20v-6h-6" strokeLinecap="round" strokeLinejoin="round" />
                 <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" strokeLinecap="round" strokeLinejoin="round" />
