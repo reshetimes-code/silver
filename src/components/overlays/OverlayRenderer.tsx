@@ -81,16 +81,21 @@ export default function OverlayRenderer({ overlayUrl, children, photoUrl, editab
               {/* Blur fill background */}
               <img src={photoUrl} alt="" className="absolute inset-0 w-full h-full object-cover"
                 style={{ filter: 'blur(30px) brightness(0.4) saturate(1.2)', transform: 'scale(1.3)' }} draggable={false} />
-              {/* Photo with FADE — wrapper moves/scales, fade sticks to photo edges */}
+              {/* Photo — moves/scales with user input */}
               <div className="absolute inset-0 flex items-center justify-center"
                 style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`, transformOrigin: 'center center' }}>
-                <div className="relative" style={{ width: '100%', height: '100%' }}>
-                  <img src={photoUrl} alt="Your photo" className="w-full h-full object-contain" draggable={false} />
-                  {/* Fade overlays — 4 sides */}
-                  <div className="absolute inset-0 pointer-events-none" style={{
-                    boxShadow: 'inset 0 30px 30px -10px rgba(0,0,0,0.8), inset 0 -30px 30px -10px rgba(0,0,0,0.8), inset 30px 0 30px -10px rgba(0,0,0,0.8), inset -30px 0 30px -10px rgba(0,0,0,0.8)',
-                  }} />
-                </div>
+                <img src={photoUrl} alt="Your photo" className="w-full h-full object-contain" draggable={false} />
+              </div>
+              {/* FADE overlay — 4 gradients on edges that blend photo into blur bg */}
+              <div className="absolute inset-0 pointer-events-none z-[5]">
+                {/* Top fade */}
+                <div className="absolute top-0 left-0 right-0 h-[15%]" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%)' }} />
+                {/* Bottom fade */}
+                <div className="absolute bottom-0 left-0 right-0 h-[15%]" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)' }} />
+                {/* Left fade */}
+                <div className="absolute top-0 bottom-0 left-0 w-[12%]" style={{ background: 'linear-gradient(to right, rgba(0,0,0,0.7) 0%, transparent 100%)' }} />
+                {/* Right fade */}
+                <div className="absolute top-0 bottom-0 right-0 w-[12%]" style={{ background: 'linear-gradient(to left, rgba(0,0,0,0.7) 0%, transparent 100%)' }} />
               </div>
             </>
           ) : children}
