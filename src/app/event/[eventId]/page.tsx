@@ -302,8 +302,8 @@ export default function CapturePhotoPage() {
       const photoCtx = photoCanvas.getContext('2d')!;
       photoCtx.drawImage(img, 0, 0, photoCanvas.width, photoCanvas.height);
 
-      const fadeX = Math.round(photoCanvas.width * 0.05);
-      const fadeY = Math.round(photoCanvas.height * 0.05);
+      const fadeX = Math.round(photoCanvas.width * 0.15);
+      const fadeY = Math.round(photoCanvas.height * 0.15);
       const imageData = photoCtx.getImageData(0, 0, photoCanvas.width, photoCanvas.height);
       const data = imageData.data;
       const pw = photoCanvas.width;

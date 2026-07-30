@@ -106,12 +106,12 @@ export default function OverlayRenderer({ overlayUrl, children, photoUrl, editab
                   transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
                   transformOrigin: 'center center',
                   maskImage: [
-                    'linear-gradient(to right,  transparent 0%, black 5%, black 95%, transparent 100%)',
-                    'linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%)',
+                    'linear-gradient(to right,  transparent 0%, black 15%, black 85%, transparent 100%)',
+                    'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)',
                   ].join(', '),
                   WebkitMaskImage: [
-                    'linear-gradient(to right,  transparent 0%, black 5%, black 95%, transparent 100%)',
-                    'linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%)',
+                    'linear-gradient(to right,  transparent 0%, black 15%, black 85%, transparent 100%)',
+                    'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)',
                   ].join(', '),
                   maskComposite: 'intersect',
                   WebkitMaskComposite: 'source-in',
