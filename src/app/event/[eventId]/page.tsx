@@ -399,6 +399,94 @@ export default function CapturePhotoPage() {
         <p className="text-sm text-white/30 mt-0.5">{event.date.replace(/-/g, '.')}</p>
       </motion.div>
 
+      {/* ===== CAMERA FULLSCREEN (outside main to avoid z-index issues) ===== */}
+      {mode === 'camera' && !capturedImage && (
+        <div className="fixed inset-0 z-[999] bg-black flex flex-col" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+          <div className="flex-1 relative overflow-hidden">
+            <Webcam key={facingMode} ref={webcamRef} audio={false}
+              screenshotFormat="image/jpeg" screenshotQuality={1}
+              videoConstraints={{ facingMode, width: { ideal: 1920, min: 1280 }, height: { ideal: 1920, min: 1280 } }}
+              className="absolute inset-0 w-full h-full object-cover"
+              mirrored={facingMode === 'user'}
+            />
+            <div className="viewfinder-corner tl" /><div className="viewfinder-corner tr" />
+            <div className="viewfinder-corner bl" /><div className="viewfinder-corner br" />
+
+            {/* Top: timer */}
+            <div className="absolute top-0 left-0 right-0 z-20 p-3 flex items-center justify-between"
+              style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.6) 0%, transparent 100%)', opacity: countdown !== null ? 0.4 : 1, pointerEvents: countdown !== null ? 'none' : 'auto' }}>
+              <div className="flex items-center gap-1.5">
+                {TIMER_OPTIONS.map((sec) => (
+                  <button key={sec}
+                    className={`px-2.5 py-1.5 rounded-full text-xs font-bold ${timerSeconds === sec ? 'bg-primary text-black' : 'bg-black/40 text-white/60'}`}
+                    onClick={() => { setTimerSeconds(sec); cancelTimer(); }}>
+                    {sec === 0 ? (he ? 'ללא' : 'Off') : `${sec}s`}
+                  </button>
+                ))}
+              </div>
+              <div className="px-2.5 py-1.5 rounded-full text-xs font-bold bg-black/40 text-[#D4AF37]">
+                {printsRemaining} {he ? 'נותרו' : 'left'}
+              </div>
+            </div>
+
+            {/* Countdown */}
+            {countdown !== null && (
+              <div className="absolute inset-0 flex items-center justify-center z-30" style={{ background: 'rgba(0,0,0,0.4)' }}>
+                <span className="countdown-number">{countdown}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Bottom controls */}
+          <div className="flex items-center justify-center gap-8 py-5 px-4 bg-black">
+            <button className="control-btn" onClick={() => { cancelTimer(); setMode('choose'); }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" /></svg>
+            </button>
+            {countdown !== null ? (
+              <button className="shutter-btn" onClick={cancelTimer} style={{ background: 'linear-gradient(135deg, #666, #888)' }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
+              </button>
+            ) : (
+              <button className="shutter-btn pulse-ring" onClick={capture}>
+                <div className="shutter-btn-inner" />
+                {timerSeconds > 0 && <span className="absolute text-black text-xs font-bold">{timerSeconds}s</span>}
+              </button>
+            )}
+            <button className="control-btn" disabled={countdown !== null} style={{ opacity: countdown !== null ? 0.4 : 1 }}
+              onClick={() => setFacingMode((f) => f === 'user' ? 'environment' : 'user')}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M1 4v6h6M23 20v-6h-6" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ===== CAPTURED PHOTO FULLSCREEN ===== */}
+      {capturedImage && (
+        <div className="fixed inset-0 z-[999] bg-black flex flex-col" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+          <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
+            <img src={capturedImage} alt="Captured" className="max-w-full max-h-full object-contain rounded-2xl" />
+          </div>
+          <div className="px-5 pb-6 pt-3 flex items-center gap-3 bg-black">
+            <button className="btn-secondary flex-1" onClick={() => { setCapturedImage(null); setMode('choose'); }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M1 4v6h6" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M3.51 15a9 9 0 1014.85-9.36L1 10" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              {t(locale, 'retake')}
+            </button>
+            <button className="btn-glow flex-1" onClick={goToPreview}>
+              {t(locale, 'usePhoto')}
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d={isRtl ? "M19 12H5M12 5l-7 7 7 7" : "M5 12h14M12 5l7 7-7 7"} strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       <main className="flex-1 flex flex-col items-center justify-center px-3 pb-6 relative z-10">
         <AnimatePresence mode="wait">
 
@@ -434,153 +522,7 @@ export default function CapturePhotoPage() {
             </motion.div>
           )}
 
-          {/* ===== CAMERA VIEW — FULLSCREEN ===== */}
-          {mode === 'camera' && !capturedImage && (
-            <motion.div key="camera" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-black flex flex-col">
-
-              {/* Full-screen viewfinder */}
-              <div className="flex-1 relative overflow-hidden">
-                <Webcam key={facingMode} ref={webcamRef} audio={false}
-                  screenshotFormat="image/jpeg" screenshotQuality={1}
-                  videoConstraints={{ facingMode, width: { ideal: 1920, min: 1280 }, height: { ideal: 1920, min: 1280 } }}
-                  className="absolute inset-0 w-full h-full object-cover"
-                  mirrored={facingMode === 'user'}
-                />
-
-                {/* Viewfinder corners */}
-                <div className="viewfinder-corner tl" /><div className="viewfinder-corner tr" />
-                <div className="viewfinder-corner bl" /><div className="viewfinder-corner br" />
-
-                {/* Top overlay — timer + aspect ratio */}
-                <div className="absolute top-0 left-0 right-0 z-20 p-3 flex items-center justify-between"
-                  style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.6) 0%, transparent 100%)', opacity: countdown !== null ? 0.4 : 1, pointerEvents: countdown !== null ? 'none' : 'auto' }}>
-                  {/* Timer */}
-                  <div className="flex items-center gap-1.5">
-                    {TIMER_OPTIONS.map((sec) => (
-                      <button key={sec}
-                        className={`px-2.5 py-1.5 rounded-full text-xs font-bold transition-all ${timerSeconds === sec
-                          ? 'bg-primary text-black'
-                          : 'bg-black/40 text-white/60 active:bg-white/20'}`}
-                        onClick={() => { setTimerSeconds(sec); cancelTimer(); }}>
-                        {sec === 0 ? (he ? 'ללא' : 'Off') : `${sec}s`}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Prints remaining */}
-                  <div className="px-2.5 py-1.5 rounded-full text-xs font-bold bg-black/40 text-[#D4AF37]">
-                    {printsRemaining} {he ? 'נותרו' : 'left'}
-                  </div>
-                </div>
-
-                {/* Countdown overlay */}
-                <AnimatePresence>
-                  {countdown !== null && (
-                    <motion.div
-                      className="absolute inset-0 flex items-center justify-center z-30"
-                      style={{ background: 'rgba(0,0,0,0.4)' }}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                    >
-                      <motion.span
-                        key={countdown}
-                        initial={{ scale: 2.5, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.5, opacity: 0 }}
-                        transition={{ type: 'spring', damping: 12 }}
-                        className="countdown-number"
-                      >
-                        {countdown}
-                      </motion.span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Bottom Controls — fixed at bottom */}
-              <div className="relative z-20 flex items-center justify-center gap-8 py-5 px-4"
-                style={{ background: 'linear-gradient(0deg, rgba(0,0,0,0.8) 0%, transparent 100%)' }}>
-                {/* Close */}
-                <motion.button
-                  className="control-btn"
-                  whileTap={{ scale: 0.85 }}
-                  onClick={() => { cancelTimer(); setMode('choose'); }}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
-                  </svg>
-                </motion.button>
-
-                {/* Shutter / Stop */}
-                {countdown !== null ? (
-                  <motion.button className="shutter-btn" whileTap={{ scale: 0.85 }} onClick={cancelTimer}
-                    style={{ background: 'linear-gradient(135deg, #666, #888)' }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-                      <rect x="6" y="6" width="12" height="12" rx="2" />
-                    </svg>
-                  </motion.button>
-                ) : (
-                  <motion.button
-                    className="shutter-btn pulse-ring"
-                    whileTap={{ scale: 0.85 }}
-                    onClick={capture}
-                  >
-                    <div className="shutter-btn-inner" />
-                    {timerSeconds > 0 && (
-                      <span className="absolute text-black text-xs font-bold">{timerSeconds}s</span>
-                    )}
-                  </motion.button>
-                )}
-
-                {/* Flip camera */}
-                <motion.button
-                  className="control-btn"
-                  whileTap={{ scale: 0.85 }}
-                  disabled={countdown !== null}
-                  style={{ opacity: countdown !== null ? 0.4 : 1 }}
-                  onClick={() => setFacingMode((f) => f === 'user' ? 'environment' : 'user')}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M1 4v6h6M23 20v-6h-6" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </motion.button>
-              </div>
-            </motion.div>
-          )}
-
-          {/* ===== CAPTURED PHOTO PREVIEW — FULLSCREEN ===== */}
-          {capturedImage && (
-            <motion.div key="captured" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-black flex flex-col">
-
-              {/* Photo preview */}
-              <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
-                <img src={capturedImage} alt="Captured" className="max-w-full max-h-full object-contain rounded-2xl" />
-              </div>
-
-              {/* Bottom buttons */}
-              <div className="relative z-20 px-5 pb-6 pt-3 flex items-center gap-3"
-                style={{ background: 'linear-gradient(0deg, rgba(0,0,0,0.9) 0%, transparent 100%)' }}>
-                <motion.button className="btn-secondary flex-1" whileTap={{ scale: 0.96 }}
-                  onClick={() => { setCapturedImage(null); setMode('choose'); }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M1 4v6h6" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M3.51 15a9 9 0 1014.85-9.36L1 10" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  {t(locale, 'retake')}
-                </motion.button>
-                <motion.button className="btn-glow flex-1" whileTap={{ scale: 0.96 }} onClick={goToPreview}>
-                  {t(locale, 'usePhoto')}
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d={isRtl ? "M19 12H5M12 5l-7 7 7 7" : "M5 12h14M12 5l7 7-7 7"} strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </motion.button>
-              </div>
-            </motion.div>
-          )}
+          {/* Camera and captured views are rendered OUTSIDE main (above) */}
         </AnimatePresence>
       </main>
 
