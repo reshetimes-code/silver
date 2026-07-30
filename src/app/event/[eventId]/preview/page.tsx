@@ -241,9 +241,9 @@ export default function PreviewPage() {
                 className="glass-card overflow-hidden active:scale-95 transition-transform"
                 onClick={() => setSelectedOverlayId(overlay.id)}
               >
-                <div className="relative overflow-hidden">
+                <div className="relative overflow-hidden bg-black">
                   <img src={overlay.url} alt={overlay.name} className="relative w-full h-auto block z-10 pointer-events-none" />
-                  <img src={image} alt="" className="absolute inset-0 w-full h-full object-cover z-0" />
+                  <img src={image} alt="" className="absolute inset-0 w-full h-full object-cover z-0" style={{ objectPosition: 'center top' }} />
                 </div>
                 <div className="p-2 text-center"><p className="text-xs font-bold text-white/70 truncate">{overlay.name}</p></div>
               </motion.button>
@@ -318,9 +318,12 @@ export default function PreviewPage() {
               <img src={image} alt="Your photo" className="w-full" />
             </div>
           ) : (
-            <OverlayRenderer overlayUrl={selectedOverlay?.url || ''}>
-              <img src={image} alt="Your photo" className="w-full h-full object-cover absolute inset-0" />
-            </OverlayRenderer>
+            <>
+              <OverlayRenderer overlayUrl={selectedOverlay?.url || ''} photoUrl={image} editable />
+              <p className="text-center text-xs text-white/30 mt-2">
+                {he ? 'גרור להזיז • צבוט לזום' : 'Drag to move • Pinch to zoom'}
+              </p>
+            </>
           )}
         </motion.div>
 
