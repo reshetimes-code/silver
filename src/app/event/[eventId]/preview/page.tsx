@@ -53,6 +53,13 @@ export default function PreviewPage() {
     });
   }, [eventId]);
 
+  // Redirect to capture page if no image or event (e.g. after print cleared sessionStorage)
+  useEffect(() => {
+    if (!loading && (!event || !image)) {
+      router.replace(`/event/${eventId}`);
+    }
+  }, [loading, event, image, router, eventId]);
+
   const handlePrint = async () => {
     if (!event || !image || !selectedOverlayId) return;
 
@@ -63,31 +70,36 @@ export default function PreviewPage() {
     setPrinting(true);
     setModerationError(null);
 
-    const result = await api.submitPhoto({
-      eventId,
-      overlayId: selectedOverlayId,
-      image,
-      deviceId,
-      phoneNumber: guestPhone,
-    });
+    try {
+      const result = await api.submitPhoto({
+        eventId,
+        overlayId: selectedOverlayId,
+        image,
+        deviceId,
+        phoneNumber: guestPhone,
+      });
 
-    if (result.error) {
-      setPrinting(false);
-      if (result.reason === 'no_face') {
-        setModerationError(t(locale, 'noFaceDetected'));
-      } else if (result.reason === 'adult_content' || result.reason === 'violence') {
-        setModerationError(t(locale, 'inappropriateContent'));
-      } else {
-        setModerationError(t(locale, 'photoRejected'));
+      if (result.error) {
+        setPrinting(false);
+        if (result.reason === 'no_face') {
+          setModerationError(t(locale, 'noFaceDetected'));
+        } else if (result.reason === 'adult_content' || result.reason === 'violence') {
+          setModerationError(t(locale, 'inappropriateContent'));
+        } else {
+          setModerationError(t(locale, 'photoRejected'));
+        }
+        return;
       }
-      return;
-    }
 
-    setSubmittedPhotoId(result.id);
-    incrementDevicePrints(eventId, deviceId);
-    setPrintSuccess(true);
-    setPrinting(false);
-    sessionStorage.removeItem('photobooth-captured-image');
+      setSubmittedPhotoId(result.id);
+      incrementDevicePrints(eventId, deviceId);
+      setPrintSuccess(true);
+      setPrinting(false);
+      sessionStorage.removeItem('photobooth-captured-image');
+    } catch {
+      setPrinting(false);
+      setModerationError(he ? 'שגיאת רשת, נסה שוב' : 'Network error, please try again');
+    }
   };
 
   const handleSendWhatsApp = () => {
@@ -128,15 +140,18 @@ export default function PreviewPage() {
 
   if (!event || !image) {
     return (
-      <div className="min-h-dvh flex items-center justify-center px-5">
+      <div className="min-h-dvh flex items-center justify-center">
         <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="glass-card p-8 text-center"
+          className="flex flex-col items-center gap-3"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
         >
-          <span className="text-5xl block mb-3">😕</span>
-          <h2 className="text-xl font-bold text-white mb-3">{t(locale, 'error')}</h2>
-          <button className="btn-secondary" onClick={() => router.push(`/event/${eventId}`)}>{t(locale, 'back')}</button>
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+            className="w-10 h-10 rounded-full border-2 border-transparent"
+            style={{ borderTopColor: '#D4AF37', borderRightColor: '#D4AF37' }}
+          />
         </motion.div>
       </div>
     );

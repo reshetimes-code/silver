@@ -77,12 +77,36 @@ async function compositePhotoWithOverlay(photoBase64: string, overlayBase64: str
       .resize(transparentArea.width, transparentArea.height, { fit: 'cover', position: 'centre' })
       .toBuffer();
 
-    // Create fade mask — soft edges so photo blends into blur bg
-    const fadeSize = Math.round(Math.min(transparentArea.width, transparentArea.height) * 0.08);
+    // Create soft-edge fade mask using SVG with feathered edges
+    const fadeSize = Math.round(Math.min(transparentArea.width, transparentArea.height) * 0.05);
+    const tw = transparentArea.width;
+    const th = transparentArea.height;
+    const fadeMask = Buffer.from(
+      `<svg width="${tw}" height="${th}">
+        <defs>
+          <linearGradient id="t" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="black"/>
+            <stop offset="${fadeSize / th}" stop-color="white"/>
+            <stop offset="${1 - fadeSize / th}" stop-color="white"/>
+            <stop offset="1" stop-color="black"/>
+          </linearGradient>
+          <linearGradient id="l" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="black"/>
+            <stop offset="${fadeSize / tw}" stop-color="white"/>
+            <stop offset="${1 - fadeSize / tw}" stop-color="white"/>
+            <stop offset="1" stop-color="black"/>
+          </linearGradient>
+          <mask id="m">
+            <rect width="${tw}" height="${th}" fill="url(#t)"/>
+            <rect width="${tw}" height="${th}" fill="url(#l)" style="mix-blend-mode:multiply"/>
+          </mask>
+        </defs>
+        <rect width="${tw}" height="${th}" fill="white" mask="url(#m)"/>
+      </svg>`
+    );
+
     const fadedPhoto = await sharp(resizedPhoto)
-      .extend({ top: fadeSize, bottom: fadeSize, left: fadeSize, right: fadeSize, background: { r: 0, g: 0, b: 0, alpha: 0 } })
-      .blur(fadeSize > 1 ? fadeSize : 2)
-      .resize(transparentArea.width, transparentArea.height, { fit: 'cover' })
+      .composite([{ input: fadeMask, blend: 'dest-in' }])
       .toBuffer();
 
     const canvas = await sharp(blurBg)
