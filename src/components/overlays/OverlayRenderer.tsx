@@ -109,10 +109,15 @@ export default function OverlayRenderer({ overlayUrl, children, photoUrl, editab
                 draggable={false}
               />
 
-              {/* Layer 3: Vignette — always hugs the visible container edges regardless of zoom */}
+              {/* Layer 3: 4-edge vignette — fade on all sides */}
               <div
                 className="absolute inset-0 pointer-events-none"
-                style={{ boxShadow: 'inset 0 0 80px 40px rgba(0,0,0,0.85)' }}
+                style={{
+                  background: [
+                    'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, transparent 22%, transparent 78%, rgba(0,0,0,0.85) 100%)',
+                    'linear-gradient(to right,  rgba(0,0,0,0.85) 0%, transparent 18%, transparent 82%, rgba(0,0,0,0.85) 100%)',
+                  ].join(', '),
+                }}
               />
             </>
           ) : children}
