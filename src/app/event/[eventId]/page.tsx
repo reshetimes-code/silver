@@ -123,28 +123,50 @@ export default function CapturePhotoPage() {
   }, []);
 
   const captureNow = useCallback(async () => {
-    // Capture at FULL video resolution, not display size
-    const video = webcamRef.current?.video;
-    if (!video) return;
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
-    if (!vw || !vh) return;
+    try {
+      // Try full resolution capture from video stream
+      const video = webcamRef.current?.video;
+      if (!video || !video.videoWidth) {
+        // Fallback to react-webcam screenshot
+        const fallback = webcamRef.current?.getScreenshot();
+        if (fallback) {
+          const cropped = await cropToAspectRatio(fallback);
+          setCapturedImage(cropped);
+        }
+        return;
+      }
 
-    const captureCanvas = document.createElement('canvas');
-    captureCanvas.width = vw;
-    captureCanvas.height = vh;
-    const ctx = captureCanvas.getContext('2d')!;
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
 
-    // If front camera, mirror horizontally
-    if (facingMode === 'user') {
-      ctx.translate(vw, 0);
-      ctx.scale(-1, 1);
+      // Cap at 1920 to prevent mobile memory issues
+      const scale = Math.min(1, 1920 / Math.max(vw, vh));
+      const cw = Math.round(vw * scale);
+      const ch = Math.round(vh * scale);
+
+      const captureCanvas = document.createElement('canvas');
+      captureCanvas.width = cw;
+      captureCanvas.height = ch;
+      const ctx = captureCanvas.getContext('2d')!;
+
+      if (facingMode === 'user') {
+        ctx.translate(cw, 0);
+        ctx.scale(-1, 1);
+      }
+      ctx.drawImage(video, 0, 0, cw, ch);
+
+      const fullResImage = captureCanvas.toDataURL('image/jpeg', 0.95);
+      const cropped = await cropToAspectRatio(fullResImage);
+      setCapturedImage(cropped);
+    } catch (err) {
+      console.error('Capture failed:', err);
+      // Fallback
+      const fallback = webcamRef.current?.getScreenshot();
+      if (fallback) {
+        const cropped = await cropToAspectRatio(fallback);
+        setCapturedImage(cropped);
+      }
     }
-    ctx.drawImage(video, 0, 0, vw, vh);
-
-    const fullResImage = captureCanvas.toDataURL('image/jpeg', 1.0);
-    const cropped = await cropToAspectRatio(fullResImage);
-    setCapturedImage(cropped);
   }, [cropToAspectRatio, facingMode]);
 
   const cancelTimer = useCallback(() => {
@@ -529,18 +551,19 @@ export default function CapturePhotoPage() {
             </motion.div>
           )}
 
-          {/* ===== CAPTURED PHOTO PREVIEW ===== */}
+          {/* ===== CAPTURED PHOTO PREVIEW — FULLSCREEN ===== */}
           {capturedImage && (
-            <motion.div key="captured" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
-              className="w-full max-w-sm flex flex-col items-center gap-4">
-              <div className="camera-viewfinder w-full overflow-hidden aspect-[9/16]"
-                style={{ maxHeight: '65vh' }}>
-                <img src={capturedImage} alt="Captured" className="w-full h-full object-cover rounded-2xl" />
-                <div className="viewfinder-corner tl" /><div className="viewfinder-corner tr" />
-                <div className="viewfinder-corner bl" /><div className="viewfinder-corner br" />
+            <motion.div key="captured" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black flex flex-col">
+
+              {/* Photo preview */}
+              <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
+                <img src={capturedImage} alt="Captured" className="max-w-full max-h-full object-contain rounded-2xl" />
               </div>
 
-              <div className="flex items-center gap-3 w-full">
+              {/* Bottom buttons */}
+              <div className="relative z-20 px-5 pb-6 pt-3 flex items-center gap-3"
+                style={{ background: 'linear-gradient(0deg, rgba(0,0,0,0.9) 0%, transparent 100%)' }}>
                 <motion.button className="btn-secondary flex-1" whileTap={{ scale: 0.96 }}
                   onClick={() => { setCapturedImage(null); setMode('choose'); }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

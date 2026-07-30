@@ -1,6 +1,6 @@
 import { prisma } from './db';
 import sharp from 'sharp';
-import { detectFaces } from './face-detect';
+import { detectTransparentArea } from './overlay-fit';
 
 // Cache the access token in memory
 let cachedAccessToken: string | null = null;
@@ -42,8 +42,9 @@ async function getAccessToken(): Promise<string> {
 }
 
 /**
- * Smart composite: detects faces and centers the crop so faces are never cut off.
- * Falls back to center crop if no faces detected.
+ * Smart composite: detects the transparent window in the overlay PNG,
+ * then fits the photo INTO that window (not behind the entire frame).
+ * This ensures the photo is visible and faces aren't hidden behind opaque borders.
  */
 async function compositePhotoWithOverlay(photoBase64: string, overlayBase64: string | null): Promise<Buffer> {
   const photoData = photoBase64.replace(/^data:image\/\w+;base64,/, '');
@@ -56,58 +57,39 @@ async function compositePhotoWithOverlay(photoBase64: string, overlayBase64: str
   const overlayData = overlayBase64.replace(/^data:image\/\w+;base64,/, '');
   const overlayBuffer = Buffer.from(overlayData, 'base64');
 
-  // Get dimensions
   const overlayMeta = await sharp(overlayBuffer).metadata();
-  const targetW = overlayMeta.width || 1080;
-  const targetH = overlayMeta.height || 1440;
-  const targetRatio = targetW / targetH;
+  const overlayW = overlayMeta.width || 1080;
+  const overlayH = overlayMeta.height || 1440;
 
-  const photoMeta = await sharp(photoBuffer).metadata();
-  const srcW = photoMeta.width || 1080;
-  const srcH = photoMeta.height || 1440;
-  const srcRatio = srcW / srcH;
+  // Detect transparent window in the overlay
+  const transparentArea = await detectTransparentArea(overlayBuffer);
 
-  // Detect faces for smart centering
-  const faces = await detectFaces(photoBuffer, srcW, srcH);
+  if (transparentArea) {
+    // Resize photo to fit inside the transparent window
+    const resizedPhoto = await sharp(photoBuffer)
+      .resize(transparentArea.width, transparentArea.height, { fit: 'cover', position: 'centre' })
+      .toBuffer();
 
-  let cropX = 0, cropY = 0, cropW = srcW, cropH = srcH;
+    // Create black background at overlay size, place photo in transparent area, then overlay on top
+    const canvas = await sharp({
+      create: { width: overlayW, height: overlayH, channels: 3, background: { r: 0, g: 0, b: 0 } }
+    })
+      .composite([
+        { input: resizedPhoto, top: transparentArea.y, left: transparentArea.x },
+        { input: overlayBuffer, top: 0, left: 0 },
+      ])
+      .jpeg({ quality: 95 })
+      .toBuffer();
 
-  if (srcRatio > targetRatio) {
-    // Photo is wider than target — need to crop sides
-    cropH = srcH;
-    cropW = Math.round(srcH * targetRatio);
-
-    if (faces) {
-      // Center crop on face center X
-      cropX = Math.round(faces.centerX * srcW - cropW / 2);
-    } else {
-      cropX = Math.round((srcW - cropW) / 2);
-    }
-    cropX = Math.max(0, Math.min(cropX, srcW - cropW));
-  } else {
-    // Photo is taller than target — need to crop top/bottom
-    cropW = srcW;
-    cropH = Math.round(srcW / targetRatio);
-
-    if (faces) {
-      // Position so faces are in upper-center, with head room
-      const faceTopPx = faces.topY * srcH;
-      // Put faces starting at ~25% from top of crop area
-      cropY = Math.round(faceTopPx - cropH * 0.2);
-    } else {
-      cropY = Math.round((srcH - cropH) / 2);
-    }
-    cropY = Math.max(0, Math.min(cropY, srcH - cropH));
+    return canvas;
   }
 
-  // Extract the smart-cropped region
-  const croppedPhoto = await sharp(photoBuffer)
-    .extract({ left: cropX, top: cropY, width: cropW, height: cropH })
-    .resize(targetW, targetH)
+  // Fallback: no transparent area detected, use standard cover
+  const resizedPhoto = await sharp(photoBuffer)
+    .resize(overlayW, overlayH, { fit: 'cover', position: 'centre' })
     .toBuffer();
 
-  // Composite: photo on bottom, overlay PNG on top
-  const composite = await sharp(croppedPhoto)
+  const composite = await sharp(resizedPhoto)
     .composite([{ input: overlayBuffer, top: 0, left: 0 }])
     .jpeg({ quality: 95 })
     .toBuffer();
