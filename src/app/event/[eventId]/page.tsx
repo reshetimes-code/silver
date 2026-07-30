@@ -37,8 +37,13 @@ export default function CapturePhotoPage() {
 
   const [event, setEvent] = useState<EventData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [mode, setMode] = useState<'phone' | 'choose' | 'camera' | 'upload'>('phone');
-  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [mode, setMode] = useState<'phone' | 'choose' | 'camera' | 'upload' | 'crop'>('phone');
+  const [rawImage, setRawImage] = useState<string | null>(null); // before crop
+  const [capturedImage, setCapturedImage] = useState<string | null>(null); // after crop
+  const [cropScale, setCropScale] = useState(1.0);
+  const [cropPos, setCropPos] = useState({ x: 0, y: 0 });
+  const cropDragRef = useRef<{ x: number; y: number } | null>(null);
+  const cropPinchRef = useRef<number>(0);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [timerSeconds, setTimerSeconds] = useState<TimerValue>(0);
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -124,22 +129,15 @@ export default function CapturePhotoPage() {
 
   const captureNow = useCallback(async () => {
     try {
-      // Try full resolution capture from video stream
       const video = webcamRef.current?.video;
       if (!video || !video.videoWidth) {
-        // Fallback to react-webcam screenshot
         const fallback = webcamRef.current?.getScreenshot();
-        if (fallback) {
-          const cropped = await cropToAspectRatio(fallback);
-          setCapturedImage(cropped);
-        }
+        if (fallback) { setRawImage(fallback); setMode('crop'); }
         return;
       }
 
       const vw = video.videoWidth;
       const vh = video.videoHeight;
-
-      // Cap at 1920 to prevent mobile memory issues
       const scale = Math.min(1, 1920 / Math.max(vw, vh));
       const cw = Math.round(vw * scale);
       const ch = Math.round(vh * scale);
@@ -156,18 +154,16 @@ export default function CapturePhotoPage() {
       ctx.drawImage(video, 0, 0, cw, ch);
 
       const fullResImage = captureCanvas.toDataURL('image/jpeg', 0.95);
-      const cropped = await cropToAspectRatio(fullResImage);
-      setCapturedImage(cropped);
+      setRawImage(fullResImage);
+      setCropScale(1.0);
+      setCropPos({ x: 0, y: 0 });
+      setMode('crop');
     } catch (err) {
       console.error('Capture failed:', err);
-      // Fallback
       const fallback = webcamRef.current?.getScreenshot();
-      if (fallback) {
-        const cropped = await cropToAspectRatio(fallback);
-        setCapturedImage(cropped);
-      }
+      if (fallback) { setRawImage(fallback); setMode('crop'); }
     }
-  }, [cropToAspectRatio, facingMode]);
+  }, [facingMode]);
 
   const cancelTimer = useCallback(() => {
     if (countdownRef.current) {
@@ -202,13 +198,54 @@ export default function CapturePhotoPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = async (ev) => {
+    reader.onload = (ev) => {
       const raw = ev.target?.result as string;
-      const cropped = await cropToAspectRatio(raw);
-      setCapturedImage(cropped);
+      setRawImage(raw);
+      setCropScale(1.0);
+      setCropPos({ x: 0, y: 0 });
+      setMode('crop');
     };
     reader.readAsDataURL(file);
   };
+
+  const confirmCrop = useCallback(() => {
+    if (!rawImage) return;
+    const img = new Image();
+    img.onload = () => {
+      const canvas = canvasRef.current || document.createElement('canvas');
+      const ctx = canvas.getContext('2d')!;
+
+      canvas.width = PHOTO_WIDTH;
+      canvas.height = PHOTO_HEIGHT;
+
+      const srcW = img.width;
+      const srcH = img.height;
+
+      // Step 1: Draw blurred background fill (stretched + blurred edges)
+      // Draw the image stretched to fill the canvas as blurred background
+      ctx.filter = 'blur(20px) brightness(0.6)';
+      const bgScale = Math.max(PHOTO_WIDTH / srcW, PHOTO_HEIGHT / srcH) * 1.3;
+      const bgW = srcW * bgScale;
+      const bgH = srcH * bgScale;
+      ctx.drawImage(img, (PHOTO_WIDTH - bgW) / 2, (PHOTO_HEIGHT - bgH) / 2, bgW, bgH);
+      ctx.filter = 'none';
+
+      // Step 2: Draw the actual photo with user's crop settings on top
+      const baseScale = Math.min(PHOTO_WIDTH / srcW, PHOTO_HEIGHT / srcH);
+      const finalScale = baseScale * cropScale;
+      const drawW = srcW * finalScale;
+      const drawH = srcH * finalScale;
+      const drawX = (PHOTO_WIDTH - drawW) / 2 + cropPos.x * (PHOTO_WIDTH / 300);
+      const drawY = (PHOTO_HEIGHT - drawH) / 2 + cropPos.y * (PHOTO_HEIGHT / 500);
+
+      ctx.drawImage(img, drawX, drawY, drawW, drawH);
+
+      const result = canvas.toDataURL('image/jpeg', 0.92);
+      setCapturedImage(result);
+      setMode('choose');
+    };
+    img.src = rawImage;
+  }, [rawImage, cropScale, cropPos]);
 
   const goToPreview = () => {
     if (!capturedImage) return;
@@ -483,25 +520,94 @@ export default function CapturePhotoPage() {
         </div>
       )}
 
-      {/* ===== CAPTURED PHOTO FULLSCREEN ===== */}
-      {capturedImage && (
+      {/* ===== CROP SCREEN — adjust photo in 9:16 frame ===== */}
+      {mode === 'crop' && rawImage && (
         <div className="fixed inset-0 z-[999] bg-black flex flex-col" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
-          <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
-            <img src={capturedImage} alt="Captured" className="max-w-full max-h-full object-contain rounded-2xl" />
+          {/* Header */}
+          <div className="p-3 text-center">
+            <p className="text-sm font-bold text-white">{he ? 'התאם את התמונה' : 'Adjust Your Photo'}</p>
+            <p className="text-[10px] text-white/40">{he ? 'גרור להזיז • צבוט לזום' : 'Drag to move • Pinch to zoom'}</p>
           </div>
-          <div className="px-5 pb-6 pt-3 flex items-center gap-3 bg-black">
-            <button className="btn-secondary flex-1" onClick={() => { setCapturedImage(null); setMode('choose'); }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M1 4v6h6" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M3.51 15a9 9 0 1014.85-9.36L1 10" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+
+          {/* Crop area — 9:16 frame */}
+          <div className="flex-1 flex items-center justify-center px-6 overflow-hidden">
+            <div
+              className="relative w-full overflow-hidden rounded-2xl border border-white/20"
+              style={{ aspectRatio: '9/16', maxHeight: '70vh', touchAction: 'none' }}
+              onTouchStart={(e) => {
+                if (e.touches.length === 1) {
+                  cropDragRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                } else if (e.touches.length === 2) {
+                  const dx = e.touches[0].clientX - e.touches[1].clientX;
+                  const dy = e.touches[0].clientY - e.touches[1].clientY;
+                  cropPinchRef.current = Math.sqrt(dx * dx + dy * dy);
+                }
+              }}
+              onTouchMove={(e) => {
+                e.preventDefault();
+                if (e.touches.length === 1 && cropDragRef.current) {
+                  const dx = e.touches[0].clientX - cropDragRef.current.x;
+                  const dy = e.touches[0].clientY - cropDragRef.current.y;
+                  cropDragRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                  setCropPos(p => ({ x: p.x + dx, y: p.y + dy }));
+                } else if (e.touches.length === 2 && cropPinchRef.current > 0) {
+                  const dx = e.touches[0].clientX - e.touches[1].clientX;
+                  const dy = e.touches[0].clientY - e.touches[1].clientY;
+                  const dist = Math.sqrt(dx * dx + dy * dy);
+                  const delta = dist / cropPinchRef.current;
+                  cropPinchRef.current = dist;
+                  setCropScale(s => Math.max(0.3, Math.min(3, s * delta)));
+                }
+              }}
+              onTouchEnd={() => { cropDragRef.current = null; cropPinchRef.current = 0; }}
+            >
+              {/* Blurred background fill */}
+              <img
+                src={rawImage}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ filter: 'blur(30px) brightness(0.5)', transform: 'scale(1.2)' }}
+                draggable={false}
+              />
+              {/* Actual photo — draggable/zoomable */}
+              <img
+                src={rawImage}
+                alt="Your photo"
+                className="absolute w-full h-full object-contain"
+                style={{
+                  transform: `translate(${cropPos.x}px, ${cropPos.y}px) scale(${cropScale})`,
+                  transformOrigin: 'center center',
+                }}
+                draggable={false}
+              />
+              {/* Grid overlay */}
+              <div className="absolute inset-0 pointer-events-none z-10"
+                style={{
+                  backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
+                  backgroundSize: '33.33% 33.33%',
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Zoom controls */}
+          <div className="flex items-center justify-center gap-4 py-2">
+            <button onClick={() => setCropScale(s => Math.max(0.3, s - 0.1))}
+              className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-white text-xl font-bold">−</button>
+            <span className="text-xs text-white/40 w-12 text-center">{Math.round(cropScale * 100)}%</span>
+            <button onClick={() => setCropScale(s => Math.min(3, s + 0.1))}
+              className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-white text-xl font-bold">+</button>
+            <button onClick={() => { setCropScale(1.0); setCropPos({ x: 0, y: 0 }); }}
+              className="px-3 py-2 rounded-full bg-white/10 border border-white/20 text-xs text-white/50">Reset</button>
+          </div>
+
+          {/* Buttons */}
+          <div className="px-5 pb-6 pt-2 flex items-center gap-3">
+            <button className="btn-secondary flex-1" onClick={() => { setRawImage(null); setMode('choose'); }}>
               {t(locale, 'retake')}
             </button>
-            <button className="btn-glow flex-1" onClick={goToPreview}>
-              {t(locale, 'usePhoto')}
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d={isRtl ? "M19 12H5M12 5l-7 7 7 7" : "M5 12h14M12 5l7 7-7 7"} strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+            <button className="btn-glow flex-1" onClick={confirmCrop}>
+              {he ? 'אישור' : 'Confirm'}
             </button>
           </div>
         </div>

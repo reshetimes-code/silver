@@ -70,10 +70,15 @@ async function compositePhotoWithOverlay(photoBase64: string, overlayBase64: str
       .resize(transparentArea.width, transparentArea.height, { fit: 'cover', position: 'centre' })
       .toBuffer();
 
-    // Create black background at overlay size, place photo in transparent area, then overlay on top
-    const canvas = await sharp({
-      create: { width: overlayW, height: overlayH, channels: 3, background: { r: 0, g: 0, b: 0 } }
-    })
+    // Create blur-filled background (stretched + blurred photo)
+    const blurBg = await sharp(photoBuffer)
+      .resize(overlayW, overlayH, { fit: 'cover', position: 'centre' })
+      .blur(25)
+      .modulate({ brightness: 0.5 })
+      .toBuffer();
+
+    // Composite: blur bg → photo in window → overlay on top
+    const canvas = await sharp(blurBg)
       .composite([
         { input: resizedPhoto, top: transparentArea.y, left: transparentArea.x },
         { input: overlayBuffer, top: 0, left: 0 },
@@ -84,13 +89,26 @@ async function compositePhotoWithOverlay(photoBase64: string, overlayBase64: str
     return canvas;
   }
 
-  // Fallback: no transparent area detected, use standard cover
-  const resizedPhoto = await sharp(photoBuffer)
+  // Fallback: no transparent area detected — blur bg + contain photo + overlay
+  const blurBg = await sharp(photoBuffer)
     .resize(overlayW, overlayH, { fit: 'cover', position: 'centre' })
+    .blur(25)
+    .modulate({ brightness: 0.5 })
     .toBuffer();
 
-  const composite = await sharp(resizedPhoto)
-    .composite([{ input: overlayBuffer, top: 0, left: 0 }])
+  const containPhoto = await sharp(photoBuffer)
+    .resize(overlayW, overlayH, { fit: 'inside', position: 'centre' })
+    .toBuffer();
+
+  const containMeta = await sharp(containPhoto).metadata();
+  const padX = Math.round((overlayW - (containMeta.width || overlayW)) / 2);
+  const padY = Math.round((overlayH - (containMeta.height || overlayH)) / 2);
+
+  const composite = await sharp(blurBg)
+    .composite([
+      { input: containPhoto, top: padY, left: padX },
+      { input: overlayBuffer, top: 0, left: 0 },
+    ])
     .jpeg({ quality: 95 })
     .toBuffer();
 
