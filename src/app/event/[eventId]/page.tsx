@@ -25,8 +25,8 @@ interface EventData {
 const TIMER_OPTIONS = [0, 3, 5, 10] as const;
 type TimerValue = typeof TIMER_OPTIONS[number];
 
-const PHOTO_WIDTH = 2160;
-const PHOTO_HEIGHT = 3840;
+const PHOTO_WIDTH = 1080;
+const PHOTO_HEIGHT = 1920;
 
 export default function CapturePhotoPage() {
   const params = useParams();
@@ -211,9 +211,29 @@ export default function CapturePhotoPage() {
   };
 
   const goToPreview = () => {
-    if (capturedImage) {
+    if (!capturedImage) return;
+    try {
       sessionStorage.setItem('photobooth-captured-image', capturedImage);
       router.push(`/event/${eventId}/preview`);
+    } catch (err) {
+      // sessionStorage full — compress and retry
+      console.error('Storage full, compressing...', err);
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = Math.min(img.width, 1080);
+        c.height = Math.round(c.width * (img.height / img.width));
+        const ctx = c.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        const compressed = c.toDataURL('image/jpeg', 0.85);
+        try {
+          sessionStorage.setItem('photobooth-captured-image', compressed);
+          router.push(`/event/${eventId}/preview`);
+        } catch {
+          alert(he ? 'שגיאה בשמירת התמונה, נסה שוב' : 'Error saving photo, please try again');
+        }
+      };
+      img.src = capturedImage;
     }
   };
 
