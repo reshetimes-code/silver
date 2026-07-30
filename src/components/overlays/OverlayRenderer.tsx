@@ -105,8 +105,6 @@ export default function OverlayRenderer({ overlayUrl, children, photoUrl, editab
                 style={{
                   transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
                   transformOrigin: 'center center',
-                  WebkitMaskImage: 'radial-gradient(ellipse 50% 50% at 50% 50%, black 90%, transparent 100%)',
-                  maskImage: 'radial-gradient(ellipse 50% 50% at 50% 50%, black 90%, transparent 100%)',
                 }}
                 draggable={false}
               />
