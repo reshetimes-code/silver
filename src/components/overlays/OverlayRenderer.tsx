@@ -75,23 +75,50 @@ export default function OverlayRenderer({ overlayUrl, children, photoUrl, editab
           draggable={false}
         />
 
-        {/* Photo behind overlay — the stored image already has 5% fade baked into its edges */}
+        {/* Photo area behind overlay */}
         <div
           ref={photoAreaRef}
           className="absolute inset-0 z-0 overflow-hidden bg-black"
           style={{ touchAction: editable ? 'none' : 'auto' }}
         >
           {photoUrl ? (
-            <img
-              src={photoUrl}
-              alt="Your photo"
-              className="absolute inset-0 w-full h-full object-cover"
-              style={{
-                transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                transformOrigin: 'center center',
-              }}
-              draggable={false}
-            />
+            <>
+              {/* Layer 1: Blurred dark background — same photo, heavily blurred + darkened */}
+              <img
+                src={photoUrl}
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
+                style={{
+                  filter: 'blur(24px) brightness(0.3)',
+                  transform: 'scale(1.08)',
+                  transformOrigin: 'center center',
+                }}
+                draggable={false}
+              />
+
+              {/* Layer 2: Main photo — fades at edges using CSS mask gradient */}
+              <img
+                src={photoUrl}
+                alt="Your photo"
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{
+                  transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+                  transformOrigin: 'center center',
+                  maskImage: [
+                    'linear-gradient(to right,  transparent 0%, black 5%, black 95%, transparent 100%)',
+                    'linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%)',
+                  ].join(', '),
+                  WebkitMaskImage: [
+                    'linear-gradient(to right,  transparent 0%, black 5%, black 95%, transparent 100%)',
+                    'linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%)',
+                  ].join(', '),
+                  maskComposite: 'intersect',
+                  WebkitMaskComposite: 'source-in',
+                }}
+                draggable={false}
+              />
+            </>
           ) : children}
         </div>
       </motion.div>
