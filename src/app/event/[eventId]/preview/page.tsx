@@ -347,9 +347,10 @@ export default function PreviewPage() {
 
       {/* Fixed bottom control bar */}
       <div className="bottom-bar">
-        <div className="flex items-center gap-3 max-w-sm mx-auto">
+        <div className="grid grid-cols-2 gap-3 max-w-sm mx-auto">
           <motion.button
-            className="btn-secondary flex-1 flex items-center justify-center gap-2"
+            className="btn-secondary flex items-center justify-center gap-2 w-full"
+            style={{ padding: '16px 12px', fontSize: '1rem', minHeight: '56px' }}
             whileTap={{ scale: 0.96 }}
             onClick={() => setSelectedOverlayId(null)}
           >
@@ -360,7 +361,8 @@ export default function PreviewPage() {
             {he ? 'החלף מסגרת' : 'Change Frame'}
           </motion.button>
           <motion.button
-            className="btn-glow flex-1 flex items-center justify-center gap-2"
+            className="btn-glow flex items-center justify-center gap-2 w-full"
+            style={{ padding: '16px 12px', fontSize: '1rem', minHeight: '56px' }}
             whileTap={{ scale: 0.96 }}
             onClick={handlePrint}
             disabled={printing}
