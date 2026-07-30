@@ -109,14 +109,21 @@ export default function OverlayRenderer({ overlayUrl, children, photoUrl, editab
                 draggable={false}
               />
 
-              {/* Layer 3: 4-edge vignette — fade on all sides */}
+              {/* Layer 3: Full vignette — 4 linear edges + 4 corner radials (user's approach) */}
               <div
                 className="absolute inset-0 pointer-events-none"
                 style={{
                   background: [
-                    'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, transparent 22%, transparent 78%, rgba(0,0,0,0.85) 100%)',
-                    'linear-gradient(to right,  rgba(0,0,0,0.85) 0%, transparent 18%, transparent 82%, rgba(0,0,0,0.85) 100%)',
+                    'linear-gradient(to top,    #000 0%, transparent 20%)',
+                    'linear-gradient(to bottom, #000 0%, transparent 20%)',
+                    'linear-gradient(to left,   #000 0%, transparent 20%)',
+                    'linear-gradient(to right,  #000 0%, transparent 20%)',
+                    'radial-gradient(circle at top left,     #000 0%, transparent 35%)',
+                    'radial-gradient(circle at top right,    #000 0%, transparent 35%)',
+                    'radial-gradient(circle at bottom left,  #000 0%, transparent 35%)',
+                    'radial-gradient(circle at bottom right, #000 0%, transparent 35%)',
                   ].join(', '),
+                  backgroundBlendMode: 'multiply',
                 }}
               />
             </>
