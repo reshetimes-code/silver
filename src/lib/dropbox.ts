@@ -64,23 +64,30 @@ async function compositePhotoWithOverlay(photoBase64: string, overlayBase64: str
   // Detect transparent window in the overlay
   const transparentArea = await detectTransparentArea(overlayBuffer);
 
+  // Create blur-filled background
+  const blurBg = await sharp(photoBuffer)
+    .resize(overlayW, overlayH, { fit: 'cover', position: 'centre' })
+    .blur(30)
+    .modulate({ brightness: 0.5 })
+    .toBuffer();
+
   if (transparentArea) {
     // Resize photo to fit inside the transparent window
     const resizedPhoto = await sharp(photoBuffer)
       .resize(transparentArea.width, transparentArea.height, { fit: 'cover', position: 'centre' })
       .toBuffer();
 
-    // Create blur-filled background (stretched + blurred photo)
-    const blurBg = await sharp(photoBuffer)
-      .resize(overlayW, overlayH, { fit: 'cover', position: 'centre' })
-      .blur(25)
-      .modulate({ brightness: 0.5 })
+    // Create fade mask — soft edges so photo blends into blur bg
+    const fadeSize = Math.round(Math.min(transparentArea.width, transparentArea.height) * 0.08);
+    const fadedPhoto = await sharp(resizedPhoto)
+      .extend({ top: fadeSize, bottom: fadeSize, left: fadeSize, right: fadeSize, background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .blur(fadeSize > 1 ? fadeSize : 2)
+      .resize(transparentArea.width, transparentArea.height, { fit: 'cover' })
       .toBuffer();
 
-    // Composite: blur bg → photo in window → overlay on top
     const canvas = await sharp(blurBg)
       .composite([
-        { input: resizedPhoto, top: transparentArea.y, left: transparentArea.x },
+        { input: fadedPhoto, top: transparentArea.y, left: transparentArea.x },
         { input: overlayBuffer, top: 0, left: 0 },
       ])
       .jpeg({ quality: 95 })
@@ -89,13 +96,7 @@ async function compositePhotoWithOverlay(photoBase64: string, overlayBase64: str
     return canvas;
   }
 
-  // Fallback: no transparent area detected — blur bg + contain photo + overlay
-  const blurBg = await sharp(photoBuffer)
-    .resize(overlayW, overlayH, { fit: 'cover', position: 'centre' })
-    .blur(25)
-    .modulate({ brightness: 0.5 })
-    .toBuffer();
-
+  // Fallback: contain photo centered on blur bg
   const containPhoto = await sharp(photoBuffer)
     .resize(overlayW, overlayH, { fit: 'inside', position: 'centre' })
     .toBuffer();

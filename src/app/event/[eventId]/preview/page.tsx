@@ -360,7 +360,7 @@ export default function PreviewPage() {
             {he ? 'החלף מסגרת' : 'Change Frame'}
           </motion.button>
           <motion.button
-            className="btn-glow flex-1 text-lg flex items-center justify-center gap-2"
+            className="btn-glow flex-1 flex items-center justify-center gap-2"
             whileTap={{ scale: 0.96 }}
             onClick={handlePrint}
             disabled={printing}

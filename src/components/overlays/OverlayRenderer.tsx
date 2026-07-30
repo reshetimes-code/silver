@@ -81,12 +81,14 @@ export default function OverlayRenderer({ overlayUrl, children, photoUrl, editab
               {/* Blur fill background */}
               <img src={photoUrl} alt="" className="absolute inset-0 w-full h-full object-cover"
                 style={{ filter: 'blur(25px) brightness(0.5)', transform: 'scale(1.2)' }} draggable={false} />
-              {/* Actual photo */}
+              {/* Actual photo with fade edges */}
               <img src={photoUrl} alt="Your photo" className="absolute inset-0 w-full h-full"
                 style={{
                   objectFit: 'contain',
                   transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
                   transformOrigin: 'center center',
+                  WebkitMaskImage: 'radial-gradient(ellipse 85% 85% at center, black 60%, transparent 100%)',
+                  maskImage: 'radial-gradient(ellipse 85% 85% at center, black 60%, transparent 100%)',
                 }}
                 draggable={false} />
             </>
