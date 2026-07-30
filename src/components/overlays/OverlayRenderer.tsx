@@ -114,16 +114,15 @@ export default function OverlayRenderer({ overlayUrl, children, photoUrl, editab
                 className="absolute inset-0 pointer-events-none"
                 style={{
                   background: [
-                    'linear-gradient(to top,    #000 0%, transparent 20%)',
-                    'linear-gradient(to bottom, #000 0%, transparent 20%)',
-                    'linear-gradient(to left,   #000 0%, transparent 20%)',
-                    'linear-gradient(to right,  #000 0%, transparent 20%)',
-                    'radial-gradient(circle at top left,     #000 0%, transparent 35%)',
-                    'radial-gradient(circle at top right,    #000 0%, transparent 35%)',
-                    'radial-gradient(circle at bottom left,  #000 0%, transparent 35%)',
-                    'radial-gradient(circle at bottom right, #000 0%, transparent 35%)',
+                    'linear-gradient(to top,    rgba(0,0,0,0.92) 0%, transparent 25%)',
+                    'linear-gradient(to bottom, rgba(0,0,0,0.92) 0%, transparent 25%)',
+                    'linear-gradient(to left,   rgba(0,0,0,0.92) 0%, transparent 25%)',
+                    'linear-gradient(to right,  rgba(0,0,0,0.92) 0%, transparent 25%)',
+                    'radial-gradient(circle at top left,     rgba(0,0,0,0.92) 0%, transparent 40%)',
+                    'radial-gradient(circle at top right,    rgba(0,0,0,0.92) 0%, transparent 40%)',
+                    'radial-gradient(circle at bottom left,  rgba(0,0,0,0.92) 0%, transparent 40%)',
+                    'radial-gradient(circle at bottom right, rgba(0,0,0,0.92) 0%, transparent 40%)',
                   ].join(', '),
-                  backgroundBlendMode: 'multiply',
                 }}
               />
             </>
