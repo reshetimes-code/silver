@@ -109,25 +109,29 @@ export default function OverlayRenderer({ overlayUrl, children, photoUrl, editab
                 draggable={false}
               />
 
-              {/* Layer 3: Full vignette — 4 linear edges + 4 corner radials (user's approach) */}
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  background: [
-                    'linear-gradient(to top,    rgba(0,0,0,0.92) 0%, transparent 25%)',
-                    'linear-gradient(to bottom, rgba(0,0,0,0.92) 0%, transparent 25%)',
-                    'linear-gradient(to left,   rgba(0,0,0,0.92) 0%, transparent 25%)',
-                    'linear-gradient(to right,  rgba(0,0,0,0.92) 0%, transparent 25%)',
-                    'radial-gradient(circle at top left,     rgba(0,0,0,0.92) 0%, transparent 40%)',
-                    'radial-gradient(circle at top right,    rgba(0,0,0,0.92) 0%, transparent 40%)',
-                    'radial-gradient(circle at bottom left,  rgba(0,0,0,0.92) 0%, transparent 40%)',
-                    'radial-gradient(circle at bottom right, rgba(0,0,0,0.92) 0%, transparent 40%)',
-                  ].join(', '),
-                }}
-              />
             </>
           ) : children}
         </div>
+
+        {/* Vignette ABOVE overlay PNG — always visible on all 4 edges */}
+        {photoUrl && (
+          <div
+            className="absolute inset-0 pointer-events-none rounded-2xl"
+            style={{
+              zIndex: 20,
+              background: [
+                'linear-gradient(to top,    rgba(0,0,0,0.88) 0%, transparent 25%)',
+                'linear-gradient(to bottom, rgba(0,0,0,0.88) 0%, transparent 25%)',
+                'linear-gradient(to left,   rgba(0,0,0,0.88) 0%, transparent 25%)',
+                'linear-gradient(to right,  rgba(0,0,0,0.88) 0%, transparent 25%)',
+                'radial-gradient(circle at top left,     rgba(0,0,0,0.88) 0%, transparent 38%)',
+                'radial-gradient(circle at top right,    rgba(0,0,0,0.88) 0%, transparent 38%)',
+                'radial-gradient(circle at bottom left,  rgba(0,0,0,0.88) 0%, transparent 38%)',
+                'radial-gradient(circle at bottom right, rgba(0,0,0,0.88) 0%, transparent 38%)',
+              ].join(', '),
+            }}
+          />
+        )}
       </motion.div>
 
       {/* Zoom controls */}
