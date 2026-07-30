@@ -557,7 +557,7 @@ export default function CapturePhotoPage() {
           <div className="flex-1 relative overflow-hidden">
             <Webcam key={facingMode} ref={webcamRef} audio={false}
               screenshotFormat="image/jpeg" screenshotQuality={1}
-              videoConstraints={{ facingMode, width: { ideal: 1920, min: 1280 }, height: { ideal: 1920, min: 1280 } }}
+              videoConstraints={{ facingMode, width: { ideal: 1080, min: 720 }, height: { ideal: 1920, min: 1280 }, aspectRatio: 9 / 16 }}
               className="absolute inset-0 w-full h-full object-cover"
               mirrored={facingMode === 'user'}
             />
