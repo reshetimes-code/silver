@@ -11,60 +11,83 @@ interface OverlayRendererProps {
 }
 
 /**
- * Creates a version of the image with faded edges using Canvas.
- * The edges gradually become transparent, revealing whatever is behind.
+ * Creates a composited image: blur background + centered photo with faded edges.
+ * Everything baked into ONE image — guaranteed to show fade.
  */
-function createFadedImage(src: string, callback: (dataUrl: string) => void) {
+function createCompositedPhoto(src: string, containerW: number, containerH: number, callback: (dataUrl: string) => void) {
   const img = new Image();
   img.onload = () => {
     try {
-    const w = img.width;
-    const h = img.height;
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d')!;
+      const canvas = document.createElement('canvas');
+      canvas.width = containerW;
+      canvas.height = containerH;
+      const ctx = canvas.getContext('2d')!;
 
-    // Draw original image
-    ctx.drawImage(img, 0, 0);
+      // 1. Draw BLUR BACKGROUND — stretch image to fill, then simulate blur with small→large
+      const tinyCanvas = document.createElement('canvas');
+      const tinySize = 15;
+      tinyCanvas.width = tinySize;
+      tinyCanvas.height = Math.round(tinySize * (containerH / containerW));
+      const tinyCtx = tinyCanvas.getContext('2d')!;
+      tinyCtx.drawImage(img, 0, 0, tinyCanvas.width, tinyCanvas.height);
 
-    // Get pixel data
-    const imageData = ctx.getImageData(0, 0, w, h);
-    const data = imageData.data;
+      // Draw tiny image scaled up = blur effect
+      ctx.globalAlpha = 0.6;
+      ctx.drawImage(tinyCanvas, 0, 0, containerW, containerH);
+      ctx.globalAlpha = 1.0;
 
-    // Fade size — 25% from each edge for strong visible blend
-    const fadeX = Math.round(w * 0.25);
-    const fadeY = Math.round(h * 0.25);
+      // 2. Calculate photo position (contain — fit inside with aspect ratio)
+      const imgRatio = img.width / img.height;
+      const containerRatio = containerW / containerH;
+      let drawW: number, drawH: number;
 
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const idx = (y * w + x) * 4;
-
-        // Calculate fade factor for each edge (0 = fully faded, 1 = fully visible)
-        let alphaFactor = 1;
-
-        // Left edge
-        if (x < fadeX) alphaFactor *= x / fadeX;
-        // Right edge
-        if (x > w - fadeX) alphaFactor *= (w - x) / fadeX;
-        // Top edge
-        if (y < fadeY) alphaFactor *= y / fadeY;
-        // Bottom edge
-        if (y > h - fadeY) alphaFactor *= (h - y) / fadeY;
-
-        // Smooth curve (ease-in-out)
-        alphaFactor = alphaFactor * alphaFactor * (3 - 2 * alphaFactor);
-
-        // Apply to alpha channel
-        data[idx + 3] = Math.round(data[idx + 3] * alphaFactor);
+      if (imgRatio > containerRatio) {
+        drawW = containerW * 0.92;
+        drawH = drawW / imgRatio;
+      } else {
+        drawH = containerH * 0.92;
+        drawW = drawH * imgRatio;
       }
-    }
+      const drawX = (containerW - drawW) / 2;
+      const drawY = (containerH - drawH) / 2;
 
-    ctx.putImageData(imageData, 0, 0);
-    callback(canvas.toDataURL('image/png'));
+      // 3. Draw photo with FADED EDGES using a temporary canvas with alpha gradient
+      const photoCanvas = document.createElement('canvas');
+      photoCanvas.width = Math.round(drawW);
+      photoCanvas.height = Math.round(drawH);
+      const photoCtx = photoCanvas.getContext('2d')!;
+      photoCtx.drawImage(img, 0, 0, photoCanvas.width, photoCanvas.height);
+
+      // Apply fade to edges
+      const fadePixelsX = Math.round(photoCanvas.width * 0.15);
+      const fadePixelsY = Math.round(photoCanvas.height * 0.15);
+      const imageData = photoCtx.getImageData(0, 0, photoCanvas.width, photoCanvas.height);
+      const data = imageData.data;
+      const pw = photoCanvas.width;
+      const ph = photoCanvas.height;
+
+      for (let y = 0; y < ph; y++) {
+        for (let x = 0; x < pw; x++) {
+          let a = 1;
+          if (x < fadePixelsX) a *= x / fadePixelsX;
+          if (x > pw - fadePixelsX) a *= (pw - x) / fadePixelsX;
+          if (y < fadePixelsY) a *= y / fadePixelsY;
+          if (y > ph - fadePixelsY) a *= (ph - y) / fadePixelsY;
+          // Smooth
+          a = a * a * (3 - 2 * a);
+          const idx = (y * pw + x) * 4;
+          data[idx + 3] = Math.round(data[idx + 3] * a);
+        }
+      }
+      photoCtx.putImageData(imageData, 0, 0);
+
+      // 4. Draw faded photo onto main canvas
+      ctx.drawImage(photoCanvas, Math.round(drawX), Math.round(drawY));
+
+      callback(canvas.toDataURL('image/jpeg', 0.92));
     } catch (err) {
-      console.error('createFadedImage failed:', err);
-      callback(src); // fallback to original
+      console.error('Composite failed:', err);
+      callback(src);
     }
   };
   img.onerror = () => callback(src);
@@ -74,17 +97,26 @@ function createFadedImage(src: string, callback: (dataUrl: string) => void) {
 export default function OverlayRenderer({ overlayUrl, children, photoUrl, editable = false }: OverlayRendererProps) {
   const [scale, setScale] = useState(1.0);
   const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [fadedPhotoUrl, setFadedPhotoUrl] = useState<string | null>(null);
+  const [compositeUrl, setCompositeUrl] = useState<string | null>(null);
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const pinchRef = useRef<number>(0);
   const photoAreaRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLImageElement>(null);
 
-  // Create faded version of photo
+  // Create composited photo (blur bg + faded photo) when overlay loads
   useEffect(() => {
-    if (photoUrl) {
-      createFadedImage(photoUrl, (url) => setFadedPhotoUrl(url));
+    if (!photoUrl) return;
+
+    const overlayImg = overlayRef.current;
+    if (overlayImg && overlayImg.complete && overlayImg.naturalWidth > 0) {
+      createCompositedPhoto(photoUrl, overlayImg.naturalWidth, overlayImg.naturalHeight, setCompositeUrl);
     }
   }, [photoUrl]);
+
+  const handleOverlayLoad = () => {
+    if (!photoUrl || !overlayRef.current) return;
+    createCompositedPhoto(photoUrl, overlayRef.current.naturalWidth, overlayRef.current.naturalHeight, setCompositeUrl);
+  };
 
   // Non-passive touch listeners
   useEffect(() => {
@@ -137,30 +169,24 @@ export default function OverlayRenderer({ overlayUrl, children, photoUrl, editab
         transition={{ duration: 0.4, type: 'spring' }}
       >
         {/* PNG overlay */}
-        <img src={overlayUrl} alt="Frame" className="relative w-full h-auto block z-10 pointer-events-none" draggable={false} />
+        <img ref={overlayRef} src={overlayUrl} alt="Frame" className="relative w-full h-auto block z-10 pointer-events-none"
+          draggable={false} onLoad={handleOverlayLoad} />
 
-        {/* Photo behind */}
+        {/* Photo behind — composited with blur bg + faded edges */}
         <div
           ref={photoAreaRef}
           className="absolute inset-0 z-0 overflow-hidden"
           style={{ touchAction: editable ? 'none' : 'auto' }}
         >
-          {photoUrl ? (
-            <>
-              {/* Blur fill background */}
-              <img src={photoUrl} alt="" className="absolute inset-0 w-full h-full object-cover"
-                style={{ filter: 'blur(30px) brightness(0.5) saturate(1.3)', transform: 'scale(1.3)' }} draggable={false} />
-              {/* Faded photo — edges are transparent, blending into blur bg */}
-              {fadedPhotoUrl && (
-                <div className="absolute inset-0 flex items-center justify-center"
-                  style={{
-                    transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                    transformOrigin: 'center center',
-                  }}>
-                  <img src={fadedPhotoUrl} alt="Your photo" className="w-full h-full object-contain" draggable={false} />
-                </div>
-              )}
-            </>
+          {compositeUrl ? (
+            <img src={compositeUrl} alt="Your photo" className="absolute inset-0 w-full h-full object-cover"
+              style={{
+                transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+                transformOrigin: 'center center',
+              }}
+              draggable={false} />
+          ) : photoUrl ? (
+            <img src={photoUrl} alt="Your photo" className="absolute inset-0 w-full h-full object-cover" draggable={false} />
           ) : children}
         </div>
       </motion.div>
