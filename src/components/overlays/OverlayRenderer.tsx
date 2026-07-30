@@ -83,7 +83,7 @@ export default function OverlayRenderer({ overlayUrl, children, photoUrl, editab
         >
           {photoUrl ? (
             <>
-              {/* Layer 1: Blurred dark background — same photo, heavily blurred + darkened */}
+              {/* Layer 1: Blurred dark background */}
               <img
                 src={photoUrl}
                 alt=""
@@ -97,7 +97,7 @@ export default function OverlayRenderer({ overlayUrl, children, photoUrl, editab
                 draggable={false}
               />
 
-              {/* Layer 2: Main photo — fades at edges using CSS mask gradient */}
+              {/* Layer 2: Main photo */}
               <img
                 src={photoUrl}
                 alt="Your photo"
@@ -105,18 +105,14 @@ export default function OverlayRenderer({ overlayUrl, children, photoUrl, editab
                 style={{
                   transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
                   transformOrigin: 'center center',
-                  maskImage: [
-                    'linear-gradient(to right,  transparent 0%, black 15%, black 85%, transparent 100%)',
-                    'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)',
-                  ].join(', '),
-                  WebkitMaskImage: [
-                    'linear-gradient(to right,  transparent 0%, black 15%, black 85%, transparent 100%)',
-                    'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)',
-                  ].join(', '),
-                  maskComposite: 'intersect',
-                  WebkitMaskComposite: 'source-in',
                 }}
                 draggable={false}
+              />
+
+              {/* Layer 3: Vignette — always hugs the visible container edges regardless of zoom */}
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{ boxShadow: 'inset 0 0 80px 40px rgba(0,0,0,0.85)' }}
               />
             </>
           ) : children}
