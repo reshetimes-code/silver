@@ -44,6 +44,53 @@ export default function CapturePhotoPage() {
   const [cropPos, setCropPos] = useState({ x: 0, y: 0 });
   const cropDragRef = useRef<{ x: number; y: number } | null>(null);
   const cropPinchRef = useRef<number>(0);
+  const cropAreaRef = useRef<HTMLDivElement>(null);
+
+  // Attach non-passive touch listeners for crop area
+  useEffect(() => {
+    const el = cropAreaRef.current;
+    if (!el || mode !== 'crop') return;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        cropDragRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      } else if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        cropPinchRef.current = Math.sqrt(dx * dx + dy * dy);
+      }
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      if (e.touches.length === 1 && cropDragRef.current) {
+        const dx = e.touches[0].clientX - cropDragRef.current.x;
+        const dy = e.touches[0].clientY - cropDragRef.current.y;
+        cropDragRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        setCropPos(p => ({ x: p.x + dx, y: p.y + dy }));
+      } else if (e.touches.length === 2 && cropPinchRef.current > 0) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const delta = dist / cropPinchRef.current;
+        cropPinchRef.current = dist;
+        setCropScale(s => Math.max(0.3, Math.min(3, s * delta)));
+      }
+    };
+    const onTouchEnd = () => {
+      cropDragRef.current = null;
+      cropPinchRef.current = 0;
+    };
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd, { passive: true });
+
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [mode]);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [timerSeconds, setTimerSeconds] = useState<TimerValue>(0);
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -212,7 +259,7 @@ export default function CapturePhotoPage() {
     if (!rawImage) return;
     const img = new Image();
     img.onload = () => {
-      const canvas = canvasRef.current || document.createElement('canvas');
+      const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d')!;
 
       canvas.width = PHOTO_WIDTH;
@@ -221,31 +268,53 @@ export default function CapturePhotoPage() {
       const srcW = img.width;
       const srcH = img.height;
 
-      // Step 1: Draw blurred background fill (stretched + blurred edges)
-      // Draw the image stretched to fill the canvas as blurred background
-      ctx.filter = 'blur(20px) brightness(0.6)';
+      // Step 1: Blurred background — draw stretched image, then blur via OffscreenCanvas or direct
+      // Simple approach: draw stretched cover as dark background
       const bgScale = Math.max(PHOTO_WIDTH / srcW, PHOTO_HEIGHT / srcH) * 1.3;
       const bgW = srcW * bgScale;
       const bgH = srcH * bgScale;
-      ctx.drawImage(img, (PHOTO_WIDTH - bgW) / 2, (PHOTO_HEIGHT - bgH) / 2, bgW, bgH);
-      ctx.filter = 'none';
 
-      // Step 2: Draw the actual photo with user's crop settings on top
+      // Draw the background (will act as blur-like fill)
+      // First pass: draw small version then scale up for blur effect
+      const blurCanvas = document.createElement('canvas');
+      const blurSize = 20; // small = more blur
+      blurCanvas.width = blurSize;
+      blurCanvas.height = Math.round(blurSize * (PHOTO_HEIGHT / PHOTO_WIDTH));
+      const blurCtx = blurCanvas.getContext('2d')!;
+      blurCtx.drawImage(img, 0, 0, blurCanvas.width, blurCanvas.height);
+      // Draw blurred bg
+      ctx.globalAlpha = 0.5;
+      ctx.drawImage(blurCanvas, 0, 0, PHOTO_WIDTH, PHOTO_HEIGHT);
+      ctx.globalAlpha = 1.0;
+
+      // Step 2: Draw actual photo with user's crop position
       const baseScale = Math.min(PHOTO_WIDTH / srcW, PHOTO_HEIGHT / srcH);
       const finalScale = baseScale * cropScale;
       const drawW = srcW * finalScale;
       const drawH = srcH * finalScale;
-      const drawX = (PHOTO_WIDTH - drawW) / 2 + cropPos.x * (PHOTO_WIDTH / 300);
-      const drawY = (PHOTO_HEIGHT - drawH) / 2 + cropPos.y * (PHOTO_HEIGHT / 500);
+      const drawX = (PHOTO_WIDTH - drawW) / 2 + cropPos.x * (PHOTO_WIDTH / 400);
+      const drawY = (PHOTO_HEIGHT - drawH) / 2 + cropPos.y * (PHOTO_HEIGHT / 700);
 
       ctx.drawImage(img, drawX, drawY, drawW, drawH);
 
       const result = canvas.toDataURL('image/jpeg', 0.92);
-      setCapturedImage(result);
-      setMode('choose');
+
+      // Save to session and go to preview
+      try {
+        sessionStorage.setItem('photobooth-captured-image', result);
+        router.push(`/event/${eventId}/preview`);
+      } catch {
+        // If too large, compress
+        const smallCanvas = document.createElement('canvas');
+        smallCanvas.width = 720;
+        smallCanvas.height = 1280;
+        smallCanvas.getContext('2d')!.drawImage(canvas, 0, 0, 720, 1280);
+        sessionStorage.setItem('photobooth-captured-image', smallCanvas.toDataURL('image/jpeg', 0.85));
+        router.push(`/event/${eventId}/preview`);
+      }
     };
     img.src = rawImage;
-  }, [rawImage, cropScale, cropPos]);
+  }, [rawImage, cropScale, cropPos, router, eventId]);
 
   const goToPreview = () => {
     if (!capturedImage) return;
@@ -532,34 +601,9 @@ export default function CapturePhotoPage() {
           {/* Crop area — 9:16 frame */}
           <div className="flex-1 flex items-center justify-center px-6 overflow-hidden">
             <div
+              ref={cropAreaRef}
               className="relative w-full overflow-hidden rounded-2xl border border-white/20"
               style={{ aspectRatio: '9/16', maxHeight: '70vh', touchAction: 'none' }}
-              onTouchStart={(e) => {
-                if (e.touches.length === 1) {
-                  cropDragRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-                } else if (e.touches.length === 2) {
-                  const dx = e.touches[0].clientX - e.touches[1].clientX;
-                  const dy = e.touches[0].clientY - e.touches[1].clientY;
-                  cropPinchRef.current = Math.sqrt(dx * dx + dy * dy);
-                }
-              }}
-              onTouchMove={(e) => {
-                e.preventDefault();
-                if (e.touches.length === 1 && cropDragRef.current) {
-                  const dx = e.touches[0].clientX - cropDragRef.current.x;
-                  const dy = e.touches[0].clientY - cropDragRef.current.y;
-                  cropDragRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-                  setCropPos(p => ({ x: p.x + dx, y: p.y + dy }));
-                } else if (e.touches.length === 2 && cropPinchRef.current > 0) {
-                  const dx = e.touches[0].clientX - e.touches[1].clientX;
-                  const dy = e.touches[0].clientY - e.touches[1].clientY;
-                  const dist = Math.sqrt(dx * dx + dy * dy);
-                  const delta = dist / cropPinchRef.current;
-                  cropPinchRef.current = dist;
-                  setCropScale(s => Math.max(0.3, Math.min(3, s * delta)));
-                }
-              }}
-              onTouchEnd={() => { cropDragRef.current = null; cropPinchRef.current = 0; }}
             >
               {/* Blurred background fill */}
               <img
