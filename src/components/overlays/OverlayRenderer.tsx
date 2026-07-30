@@ -16,8 +16,8 @@ interface OverlayRendererProps {
  */
 function createFadedImage(src: string, callback: (dataUrl: string) => void) {
   const img = new Image();
-  img.crossOrigin = 'anonymous';
   img.onload = () => {
+    try {
     const w = img.width;
     const h = img.height;
     const canvas = document.createElement('canvas');
@@ -32,9 +32,9 @@ function createFadedImage(src: string, callback: (dataUrl: string) => void) {
     const imageData = ctx.getImageData(0, 0, w, h);
     const data = imageData.data;
 
-    // Fade size as percentage of dimensions
-    const fadeX = Math.round(w * 0.12);
-    const fadeY = Math.round(h * 0.12);
+    // Fade size — 25% from each edge for strong visible blend
+    const fadeX = Math.round(w * 0.25);
+    const fadeY = Math.round(h * 0.25);
 
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
@@ -62,7 +62,12 @@ function createFadedImage(src: string, callback: (dataUrl: string) => void) {
 
     ctx.putImageData(imageData, 0, 0);
     callback(canvas.toDataURL('image/png'));
+    } catch (err) {
+      console.error('createFadedImage failed:', err);
+      callback(src); // fallback to original
+    }
   };
+  img.onerror = () => callback(src);
   img.src = src;
 }
 

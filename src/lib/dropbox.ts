@@ -77,41 +77,10 @@ async function compositePhotoWithOverlay(photoBase64: string, overlayBase64: str
       .resize(transparentArea.width, transparentArea.height, { fit: 'cover', position: 'centre' })
       .toBuffer();
 
-    // Create soft-edge fade mask using SVG with feathered edges
-    const fadeSize = Math.round(Math.min(transparentArea.width, transparentArea.height) * 0.05);
-    const tw = transparentArea.width;
-    const th = transparentArea.height;
-    const fadeMask = Buffer.from(
-      `<svg width="${tw}" height="${th}">
-        <defs>
-          <linearGradient id="t" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="black"/>
-            <stop offset="${fadeSize / th}" stop-color="white"/>
-            <stop offset="${1 - fadeSize / th}" stop-color="white"/>
-            <stop offset="1" stop-color="black"/>
-          </linearGradient>
-          <linearGradient id="l" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stop-color="black"/>
-            <stop offset="${fadeSize / tw}" stop-color="white"/>
-            <stop offset="${1 - fadeSize / tw}" stop-color="white"/>
-            <stop offset="1" stop-color="black"/>
-          </linearGradient>
-          <mask id="m">
-            <rect width="${tw}" height="${th}" fill="url(#t)"/>
-            <rect width="${tw}" height="${th}" fill="url(#l)" style="mix-blend-mode:multiply"/>
-          </mask>
-        </defs>
-        <rect width="${tw}" height="${th}" fill="white" mask="url(#m)"/>
-      </svg>`
-    );
-
-    const fadedPhoto = await sharp(resizedPhoto)
-      .composite([{ input: fadeMask, blend: 'dest-in' }])
-      .toBuffer();
-
+    // Composite: blur bg → photo in window → overlay frame on top
     const canvas = await sharp(blurBg)
       .composite([
-        { input: fadedPhoto, top: transparentArea.y, left: transparentArea.x },
+        { input: resizedPhoto, top: transparentArea.y, left: transparentArea.x },
         { input: overlayBuffer, top: 0, left: 0 },
       ])
       .jpeg({ quality: 95 })
