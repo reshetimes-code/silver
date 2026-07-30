@@ -287,7 +287,7 @@ export default function CapturePhotoPage() {
       ctx.drawImage(blurCanvas, 0, 0, PHOTO_WIDTH, PHOTO_HEIGHT);
       ctx.globalAlpha = 1.0;
 
-      // Step 2: Draw actual photo with user's crop position
+      // Step 2: Draw actual photo with user's crop position + 5% soft edge fade
       const baseScale = Math.min(PHOTO_WIDTH / srcW, PHOTO_HEIGHT / srcH);
       const finalScale = baseScale * cropScale;
       const drawW = srcW * finalScale;
@@ -295,7 +295,33 @@ export default function CapturePhotoPage() {
       const drawX = (PHOTO_WIDTH - drawW) / 2 + cropPos.x * (PHOTO_WIDTH / 400);
       const drawY = (PHOTO_HEIGHT - drawH) / 2 + cropPos.y * (PHOTO_HEIGHT / 700);
 
-      ctx.drawImage(img, drawX, drawY, drawW, drawH);
+      // Draw photo into a temp canvas, apply 5% alpha fade to all 4 edges
+      const photoCanvas = document.createElement('canvas');
+      photoCanvas.width = Math.max(1, Math.round(drawW));
+      photoCanvas.height = Math.max(1, Math.round(drawH));
+      const photoCtx = photoCanvas.getContext('2d')!;
+      photoCtx.drawImage(img, 0, 0, photoCanvas.width, photoCanvas.height);
+
+      const fadeX = Math.round(photoCanvas.width * 0.05);
+      const fadeY = Math.round(photoCanvas.height * 0.05);
+      const imageData = photoCtx.getImageData(0, 0, photoCanvas.width, photoCanvas.height);
+      const data = imageData.data;
+      const pw = photoCanvas.width;
+      const ph = photoCanvas.height;
+      for (let y = 0; y < ph; y++) {
+        for (let x = 0; x < pw; x++) {
+          let a = 1.0;
+          if (x < fadeX) a = Math.min(a, x / fadeX);
+          if (x > pw - fadeX) a = Math.min(a, (pw - x) / fadeX);
+          if (y < fadeY) a = Math.min(a, y / fadeY);
+          if (y > ph - fadeY) a = Math.min(a, (ph - y) / fadeY);
+          data[(y * pw + x) * 4 + 3] = Math.round(data[(y * pw + x) * 4 + 3] * a);
+        }
+      }
+      photoCtx.putImageData(imageData, 0, 0);
+
+      // Composite faded photo onto blurred background
+      ctx.drawImage(photoCanvas, Math.round(drawX), Math.round(drawY));
 
       const result = canvas.toDataURL('image/jpeg', 0.92);
 
