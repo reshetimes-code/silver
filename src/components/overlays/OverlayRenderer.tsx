@@ -78,17 +78,25 @@ export default function OverlayRenderer({ overlayUrl, children, photoUrl, editab
         >
           {photoUrl ? (
             <>
-              {/* Blur fill background */}
+              {/* Blur fill background — sampled from photo edges */}
               <img src={photoUrl} alt="" className="absolute inset-0 w-full h-full object-cover"
-                style={{ filter: 'blur(25px) brightness(0.5)', transform: 'scale(1.2)' }} draggable={false} />
-              {/* Actual photo with fade edges */}
-              <img src={photoUrl} alt="Your photo" className="absolute inset-0 w-full h-full"
+                style={{ filter: 'blur(30px) brightness(0.4) saturate(1.2)', transform: 'scale(1.3)' }} draggable={false} />
+              {/* Actual photo with FADE edges — gradual blend into blur bg */}
+              <img src={photoUrl} alt="Your photo" className="absolute w-full h-full"
                 style={{
                   objectFit: 'contain',
                   transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
                   transformOrigin: 'center center',
-                  WebkitMaskImage: 'radial-gradient(ellipse 85% 85% at center, black 60%, transparent 100%)',
-                  maskImage: 'radial-gradient(ellipse 85% 85% at center, black 60%, transparent 100%)',
+                  WebkitMaskImage: `
+                    linear-gradient(to bottom, transparent 0%, black 8%, black 92%, transparent 100%),
+                    linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)
+                  `,
+                  WebkitMaskComposite: 'destination-in',
+                  maskImage: `
+                    linear-gradient(to bottom, transparent 0%, black 8%, black 92%, transparent 100%),
+                    linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)
+                  `,
+                  maskComposite: 'intersect',
                 }}
                 draggable={false} />
             </>
