@@ -8,14 +8,21 @@ interface OverlayRendererProps {
   children?: React.ReactNode;
   photoUrl?: string;
   editable?: boolean;
+  onAdjust?: (pos: { x: number; y: number }, scale: number, size: { w: number; h: number }) => void;
 }
 
-export default function OverlayRenderer({ overlayUrl, children, photoUrl, editable = false }: OverlayRendererProps) {
+export default function OverlayRenderer({ overlayUrl, children, photoUrl, editable = false, onAdjust }: OverlayRendererProps) {
   const [scale, setScale] = useState(1.0);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const pinchRef = useRef<number>(0);
   const photoAreaRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!onAdjust || !photoAreaRef.current) return;
+    const { width, height } = photoAreaRef.current.getBoundingClientRect();
+    onAdjust(position, scale, { w: width, h: height });
+  }, [position, scale, onAdjust]);
 
   // Non-passive touch listeners for drag/pinch
   useEffect(() => {

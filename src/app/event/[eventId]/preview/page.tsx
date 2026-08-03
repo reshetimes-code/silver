@@ -13,6 +13,41 @@ import LanguageToggle from '@/components/ui/LanguageToggle';
 import Footer from '@/components/ui/Footer';
 import ParticleBackground from '@/components/ui/ParticleBackground';
 
+function loadImg(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+async function buildComposite(
+  photoUrl: string,
+  overlayUrl: string,
+  adjust: { pos: { x: number; y: number }; scale: number; size: { w: number; h: number } }
+): Promise<string> {
+  const [photo, overlay] = await Promise.all([loadImg(photoUrl), loadImg(overlayUrl)]);
+  const W = 1080, H = 1920;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d')!;
+  // background fill
+  ctx.drawImage(photo, 0, 0, W, H);
+  // photo at user-adjusted position/scale
+  const base = Math.max(W / photo.width, H / photo.height);
+  const s = base * adjust.scale;
+  const dw = photo.width * s;
+  const dh = photo.height * s;
+  const dx = (W - dw) / 2 + adjust.pos.x * (W / adjust.size.w);
+  const dy = (H - dh) / 2 + adjust.pos.y * (H / adjust.size.h);
+  ctx.drawImage(photo, dx, dy, dw, dh);
+  // overlay on top
+  ctx.drawImage(overlay, 0, 0, W, H);
+  return canvas.toDataURL('image/jpeg', 0.92);
+}
+
 function seededRandom(seed: number): number {
   const x = Math.sin(seed * 9301 + 49297) * 49297;
   return x - Math.floor(x);
@@ -32,6 +67,7 @@ export default function PreviewPage() {
   const [event, setEvent] = useState<EventData | null>(null);
   const [overlays, setOverlays] = useState<OverlayData[]>([]);
   const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null);
+  const [photoAdjust, setPhotoAdjust] = useState({ pos: { x: 0, y: 0 }, scale: 1.0, size: { w: 320, h: 568 } });
   const [printing, setPrinting] = useState(false);
   const [printSuccess, setPrintSuccess] = useState(false);
   const [submittedPhotoId, setSubmittedPhotoId] = useState<string | null>(null);
@@ -71,10 +107,17 @@ export default function PreviewPage() {
     setModerationError(null);
 
     try {
+      let finalImage = image;
+      let finalOverlayId = selectedOverlayId;
+      if (selectedOverlayId !== 'none' && selectedOverlay) {
+        finalImage = await buildComposite(image, selectedOverlay.url, photoAdjust);
+        finalOverlayId = 'none';
+      }
+
       const result = await api.submitPhoto({
         eventId,
-        overlayId: selectedOverlayId,
-        image,
+        overlayId: finalOverlayId,
+        image: finalImage,
         deviceId,
         phoneNumber: guestPhone,
       });
@@ -254,7 +297,7 @@ export default function PreviewPage() {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: i * 0.05 }}
                 className="glass-card overflow-hidden active:scale-95 transition-transform"
-                onClick={() => setSelectedOverlayId(overlay.id)}
+                onClick={() => { setSelectedOverlayId(overlay.id); setPhotoAdjust({ pos: { x: 0, y: 0 }, scale: 1.0, size: { w: 320, h: 568 } }); }}
               >
                 <div className="relative overflow-hidden bg-black">
                   <img src={overlay.url} alt={overlay.name} className="relative w-full h-auto block z-10 pointer-events-none" />
@@ -334,7 +377,12 @@ export default function PreviewPage() {
             </div>
           ) : (
             <>
-              <OverlayRenderer overlayUrl={selectedOverlay?.url || ''} photoUrl={image} editable />
+              <OverlayRenderer
+              overlayUrl={selectedOverlay?.url || ''}
+              photoUrl={image}
+              editable
+              onAdjust={(pos, scale, size) => setPhotoAdjust({ pos, scale, size })}
+            />
               <p className="text-center text-xs text-white/30 mt-2">
                 {he ? 'גרור להזיז • צבוט לזום' : 'Drag to move • Pinch to zoom'}
               </p>
