@@ -1,6 +1,4 @@
-import vision from '@google-cloud/vision';
-
-const client = new vision.ImageAnnotatorClient();
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export interface ModerationResult {
   status: 'approved' | 'rejected' | 'pending_review';
@@ -8,66 +6,73 @@ export interface ModerationResult {
 }
 
 export async function moderateImage(base64Image: string): Promise<ModerationResult> {
+  const apiKey = process.env.GOOGLE_API_KEY;
+  if (!apiKey) {
+    console.warn('GOOGLE_API_KEY not set — skipping moderation');
+    return { status: 'pending_review', reason: 'moderation_error' };
+  }
+
   try {
-    // Strip data URL prefix if present
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
     const imageData = base64Image.replace(/^data:image\/\w+;base64,/, '');
-    const imageBuffer = Buffer.from(imageData, 'base64');
 
-    // Run face detection + SafeSearch in parallel
-    const [faceResult, safeSearchResult] = await Promise.all([
-      client.faceDetection({ image: { content: imageBuffer } }),
-      client.safeSearchDetection({ image: { content: imageBuffer } }),
-    ]);
+    const result = await model.generateContent({
+      contents: [{
+        role: 'user',
+        parts: [
+          {
+            inlineData: {
+              mimeType: 'image/jpeg',
+              data: imageData,
+            },
+          },
+          {
+            text: `Analyze this photo booth image and respond with ONLY a JSON object (no markdown, no explanation):
+{
+  "hasFace": true/false,
+  "isAdult": true/false,
+  "isViolent": true/false,
+  "isRacy": true/false
+}
 
-    const faces = faceResult[0].faceAnnotations || [];
-    const safeSearch = safeSearchResult[0].safeSearchAnnotation;
+Rules:
+- hasFace: true if there is at least one clearly visible human face
+- isAdult: true only if there is explicit nudity or sexual content
+- isViolent: true only if there is graphic violence or weapons
+- isRacy: true if content is suggestive but not fully explicit`,
+          },
+        ],
+      }],
+    });
 
-    // 1. Must have at least one face
-    if (faces.length === 0) {
-      return {
-        status: 'rejected',
-        reason: 'no_face',
-      };
+    const text = result.response.text().trim();
+    // Extract JSON from response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.error('Gemini returned unexpected format:', text);
+      return { status: 'pending_review', reason: 'moderation_error' };
     }
 
-    // 2. Check SafeSearch categories
-    if (safeSearch) {
-      const { adult, violence, racy, medical } = safeSearch;
+    const analysis = JSON.parse(jsonMatch[0]);
 
-      // VERY_LIKELY or LIKELY = auto reject
-      const highRisk = ['VERY_LIKELY', 'LIKELY'];
-      if (highRisk.includes(adult as string)) {
-        return { status: 'rejected', reason: 'adult_content' };
-      }
-      if (highRisk.includes(violence as string)) {
-        return { status: 'rejected', reason: 'violence' };
-      }
-
-      // POSSIBLE = flag for review
-      const mediumRisk = ['POSSIBLE'];
-      if (mediumRisk.includes(adult as string) || mediumRisk.includes(racy as string)) {
-        return { status: 'pending_review', reason: 'suspicious_content' };
-      }
-      if (mediumRisk.includes(violence as string) || mediumRisk.includes(medical as string)) {
-        return { status: 'pending_review', reason: 'suspicious_content' };
-      }
-
-      // LIKELY racy = flag for review
-      if (highRisk.includes(racy as string)) {
-        return { status: 'pending_review', reason: 'racy_content' };
-      }
+    if (!analysis.hasFace) {
+      return { status: 'rejected', reason: 'no_face' };
     }
-
-    // 3. Check face confidence - very low confidence might mean a photo of a photo
-    const avgConfidence = faces.reduce((sum, f) => sum + (f.detectionConfidence || 0), 0) / faces.length;
-    if (avgConfidence < 0.5) {
-      return { status: 'pending_review', reason: 'low_face_confidence' };
+    if (analysis.isAdult) {
+      return { status: 'rejected', reason: 'adult_content' };
+    }
+    if (analysis.isViolent) {
+      return { status: 'rejected', reason: 'violence' };
+    }
+    if (analysis.isRacy) {
+      return { status: 'pending_review', reason: 'racy_content' };
     }
 
     return { status: 'approved' };
   } catch (error) {
     console.error('Moderation error:', error);
-    // On error, approve but flag for review so we don't block the user
     return { status: 'pending_review', reason: 'moderation_error' };
   }
 }
