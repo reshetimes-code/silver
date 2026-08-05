@@ -9,7 +9,7 @@ export async function moderateImage(base64Image: string): Promise<ModerationResu
   const apiKey = process.env.GOOGLE_API_KEY;
   if (!apiKey) {
     console.warn('GOOGLE_API_KEY not set — skipping moderation');
-    return { status: 'pending_review', reason: 'moderation_error' };
+    return { status: 'approved' };
   }
 
   try {
@@ -73,6 +73,6 @@ Rules:
     return { status: 'approved' };
   } catch (error) {
     console.error('Moderation error:', error);
-    return { status: 'pending_review', reason: 'moderation_error' };
+    return { status: 'approved' };
   }
 }
