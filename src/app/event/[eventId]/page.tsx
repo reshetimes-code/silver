@@ -568,8 +568,8 @@ export default function CapturePhotoPage() {
             <Webcam key={selectedDeviceId || facingMode} ref={webcamRef} audio={false}
               screenshotFormat="image/jpeg" screenshotQuality={1}
               videoConstraints={selectedDeviceId
-                ? { deviceId: { exact: selectedDeviceId }, width: { ideal: 1080, min: 720 }, height: { ideal: 1920, min: 1280 }, aspectRatio: 9 / 16 }
-                : { facingMode, width: { ideal: 1080, min: 720 }, height: { ideal: 1920, min: 1280 }, aspectRatio: 9 / 16 }
+                ? { deviceId: { exact: selectedDeviceId } }
+                : { facingMode }
               }
               className="absolute inset-0 w-full h-full object-cover"
               mirrored={facingMode === 'user' && !selectedDeviceId}
