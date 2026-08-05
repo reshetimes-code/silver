@@ -561,51 +561,52 @@ export default function CapturePhotoPage() {
         <p className="text-sm text-white/30 mt-0.5">{event.date.replace(/-/g, '.')}</p>
       </motion.div>
 
-      {/* ===== CAMERA FULLSCREEN (outside main to avoid z-index issues) ===== */}
+      {/* ===== CAMERA FULLSCREEN ===== */}
       {mode === 'camera' && !capturedImage && (
-        <div className="fixed inset-0 z-[999] bg-black flex flex-col" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
-          <div className="flex-1 relative overflow-hidden">
-            <Webcam key={selectedDeviceId || facingMode} ref={webcamRef} audio={false}
-              screenshotFormat="image/jpeg" screenshotQuality={1}
-              videoConstraints={selectedDeviceId
-                ? { deviceId: { exact: selectedDeviceId } }
-                : { facingMode }
-              }
-              className="absolute inset-0 w-full h-full object-cover"
-              mirrored={facingMode === 'user' && !selectedDeviceId}
-              onUserMedia={handleWebcamReady}
-            />
-            <div className="viewfinder-corner tl" /><div className="viewfinder-corner tr" />
-            <div className="viewfinder-corner bl" /><div className="viewfinder-corner br" />
+        <div className="fixed inset-0 z-[999] bg-black" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+          {/* Camera fills entire screen */}
+          <Webcam key={selectedDeviceId || facingMode} ref={webcamRef} audio={false}
+            screenshotFormat="image/jpeg" screenshotQuality={1}
+            videoConstraints={selectedDeviceId
+              ? { deviceId: { exact: selectedDeviceId } }
+              : { facingMode }
+            }
+            className="absolute inset-0 w-full h-full object-cover"
+            mirrored={facingMode === 'user' && !selectedDeviceId}
+            onUserMedia={handleWebcamReady}
+          />
 
-            {/* Top: timer */}
-            <div className="absolute top-0 left-0 right-0 z-20 p-3 flex items-center justify-between"
-              style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.6) 0%, transparent 100%)', opacity: countdown !== null ? 0.4 : 1, pointerEvents: countdown !== null ? 'none' : 'auto' }}>
-              <div className="flex items-center gap-1.5">
-                {TIMER_OPTIONS.map((sec) => (
-                  <button key={sec}
-                    className={`px-2.5 py-1.5 rounded-full text-xs font-bold ${timerSeconds === sec ? 'bg-primary text-black' : 'bg-black/40 text-white/60'}`}
-                    onClick={() => { setTimerSeconds(sec); cancelTimer(); }}>
-                    {sec === 0 ? (he ? 'ללא' : 'Off') : `${sec}s`}
-                  </button>
-                ))}
-              </div>
-              <div className="px-2.5 py-1.5 rounded-full text-xs font-bold bg-black/40 text-[#D4AF37]">
-                {printsRemaining} {he ? 'נותרו' : 'left'}
-              </div>
+          {/* Viewfinder corners */}
+          <div className="viewfinder-corner tl" /><div className="viewfinder-corner tr" />
+          <div className="viewfinder-corner bl" /><div className="viewfinder-corner br" />
+
+          {/* Top overlay: timer + prints remaining */}
+          <div className="absolute top-0 left-0 right-0 z-20 p-4 flex items-center justify-between"
+            style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.55) 0%, transparent 100%)', opacity: countdown !== null ? 0.3 : 1, pointerEvents: countdown !== null ? 'none' : 'auto' }}>
+            <div className="flex items-center gap-1.5">
+              {TIMER_OPTIONS.map((sec) => (
+                <button key={sec}
+                  className={`px-2.5 py-1.5 rounded-full text-xs font-bold ${timerSeconds === sec ? 'bg-primary text-black' : 'bg-black/40 text-white/60'}`}
+                  onClick={() => { setTimerSeconds(sec); cancelTimer(); }}>
+                  {sec === 0 ? (he ? 'ללא' : 'Off') : `${sec}s`}
+                </button>
+              ))}
             </div>
-
-            {/* Countdown */}
-            {countdown !== null && (
-              <div className="absolute inset-0 flex items-center justify-center z-30" style={{ background: 'rgba(0,0,0,0.4)' }}>
-                <span className="countdown-number">{countdown}</span>
-              </div>
-            )}
+            <div className="px-2.5 py-1.5 rounded-full text-xs font-bold bg-black/40 text-[#D4AF37]">
+              {printsRemaining} {he ? 'נותרו' : 'left'}
+            </div>
           </div>
 
-          {/* Lens selector — shows when multiple back cameras available */}
+          {/* Countdown overlay */}
+          {countdown !== null && (
+            <div className="absolute inset-0 flex items-center justify-center z-30" style={{ background: 'rgba(0,0,0,0.4)' }}>
+              <span className="countdown-number">{countdown}</span>
+            </div>
+          )}
+
+          {/* Lens selector — floats above bottom controls */}
           {facingMode === 'environment' && videoDevices.filter(d => !d.label.toLowerCase().includes('front')).length > 1 && (
-            <div className="flex items-center justify-center gap-2 py-2 bg-black">
+            <div className="absolute bottom-28 left-0 right-0 z-20 flex items-center justify-center gap-2">
               {videoDevices
                 .filter(d => !d.label.toLowerCase().includes('front'))
                 .map((device, i) => {
@@ -615,16 +616,13 @@ export default function CapturePhotoPage() {
                     : `${i + 1}×`;
                   const isActive = selectedDeviceId === device.deviceId;
                   return (
-                    <button
-                      key={device.deviceId}
-                      onClick={() => setSelectedDeviceId(device.deviceId)}
+                    <button key={device.deviceId} onClick={() => setSelectedDeviceId(device.deviceId)}
                       className="px-3 py-1.5 rounded-full text-xs font-bold transition-all"
                       style={{
-                        background: isActive ? 'rgba(255,200,0,0.9)' : 'rgba(0,0,0,0.6)',
+                        background: isActive ? 'rgba(255,200,0,0.9)' : 'rgba(0,0,0,0.5)',
                         color: isActive ? '#000' : '#FFD700',
                         border: '1px solid rgba(255,200,0,0.5)',
-                      }}
-                    >
+                      }}>
                       {zoomLabel}
                     </button>
                   );
@@ -632,8 +630,9 @@ export default function CapturePhotoPage() {
             </div>
           )}
 
-          {/* Bottom controls */}
-          <div className="flex items-center justify-center gap-8 py-5 px-4 bg-black">
+          {/* Bottom controls — transparent overlay */}
+          <div className="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-center gap-8 pb-10 pt-6 px-4"
+            style={{ background: 'linear-gradient(0deg, rgba(0,0,0,0.55) 0%, transparent 100%)' }}>
             <button className="control-btn" onClick={() => { cancelTimer(); setMode('choose'); }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" /></svg>
             </button>
