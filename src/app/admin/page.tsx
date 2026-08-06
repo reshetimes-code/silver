@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
 import { useStore } from '@/lib/store';
@@ -12,6 +12,90 @@ import Logo from '@/components/ui/Logo';
 import AdminAuth from '@/components/ui/AdminAuth';
 import ParticleBackground from '@/components/ui/ParticleBackground';
 import Link from 'next/link';
+
+/* ===================== BRANDED LOADER ===================== */
+function BrandedLoader({ message }: { message: string }) {
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[9999] flex flex-col items-center justify-center"
+        style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)' }}
+      >
+        {/* Outer spinning ring */}
+        <div className="relative flex items-center justify-center mb-6">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+            className="absolute w-28 h-28 rounded-full"
+            style={{ border: '2px solid transparent', borderTopColor: '#D4AF37', borderRightColor: '#D4AF37' }}
+          />
+          <motion.div
+            animate={{ rotate: -360 }}
+            transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+            className="absolute w-20 h-20 rounded-full"
+            style={{ border: '1px solid transparent', borderTopColor: 'rgba(212,175,55,0.4)', borderLeftColor: 'rgba(212,175,55,0.4)' }}
+          />
+          {/* Camera icon */}
+          <motion.div
+            animate={{ scale: [1, 1.08, 1] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+            className="w-14 h-14 rounded-full flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.2), rgba(212,175,55,0.05))', border: '1px solid rgba(212,175,55,0.3)' }}
+          >
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="1.5">
+              <rect x="2" y="6" width="20" height="14" rx="3" />
+              <circle cx="12" cy="13" r="4" />
+              <path d="M8 6V4.5A1.5 1.5 0 019.5 3h5A1.5 1.5 0 0116 4.5V6" />
+            </svg>
+          </motion.div>
+        </div>
+
+        {/* PHOTO BOOTH text */}
+        <motion.div
+          animate={{ opacity: [0.6, 1, 0.6] }}
+          transition={{ duration: 2, repeat: Infinity }}
+          className="text-center"
+        >
+          <p className="text-xs tracking-[0.3em] text-[#D4AF37]/60 uppercase mb-1">PHOTO BOOTH</p>
+          <p className="text-sm font-bold text-white/80">{message}</p>
+        </motion.div>
+
+        {/* Animated dots */}
+        <div className="flex gap-1.5 mt-4">
+          {[0, 1, 2].map(i => (
+            <motion.div key={i} className="w-1.5 h-1.5 rounded-full bg-[#D4AF37]"
+              animate={{ opacity: [0.2, 1, 0.2], y: [0, -4, 0] }}
+              transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }} />
+          ))}
+        </div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+/* hook: show loader only after 2s delay */
+function useLoader() {
+  const [message, setMessage] = useState<string | null>(null);
+  const [visible, setVisible] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const start = useCallback((msg: string) => {
+    setMessage(msg);
+    timerRef.current = setTimeout(() => setVisible(true), 2000);
+  }, []);
+
+  const stop = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = null;
+    setVisible(false);
+    setMessage(null);
+  }, []);
+
+  return { visible, message, start, stop };
+}
 
 type Tab = 'events' | 'overlays' | 'photos' | 'users';
 
@@ -104,6 +188,7 @@ function EventsTab() {
   const [maxPrints, setMaxPrints] = useState(5);
   const [errors, setErrors] = useState<{ name?: boolean; date?: boolean }>({});
   const [loading, setLoading] = useState(true);
+  const loader = useLoader();
 
   const loadEvents = () => {
     api.getEvents().then((data) => { setEvents(data); setLoading(false); });
@@ -122,15 +207,16 @@ function EventsTab() {
       Swal.fire({ icon: 'warning', title: he ? 'שדות חסרים' : 'Missing Fields', text: he ? 'נא למלא שם אירוע ותאריך' : 'Please fill in event name and date', background: '#0a0a0a', color: '#fff', confirmButtonColor: '#D4AF37' });
       return;
     }
-
+    loader.start(editingId ? (he ? 'שומר שינויים...' : 'Saving changes...') : (he ? 'יוצר אירוע...' : 'Creating event...'));
     if (editingId) {
       await api.updateEvent(editingId, { name, date, maxPrintsPerDevice: maxPrints });
     } else {
       await api.createEvent({ name, date, maxPrintsPerDevice: maxPrints });
     }
+    loader.stop();
     resetForm();
     loadEvents();
-    Swal.fire({ icon: 'success', title: he ? 'נשמר!' : 'Saved!', timer: 1500, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
+    Swal.fire({ icon: 'success', title: he ? '✅ נשמר בהצלחה!' : '✅ Saved!', text: editingId ? (he ? 'האירוע עודכן' : 'Event updated') : (he ? `האירוע "${name}" נוצר` : `Event "${name}" created`), timer: 2000, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
   };
 
   const startEdit = (id: string) => {
@@ -141,22 +227,29 @@ function EventsTab() {
   };
 
   const handleDelete = async (id: string) => {
-    const result = await Swal.fire({ icon: 'warning', title: he ? 'למחוק אירוע?' : 'Delete event?', text: he ? 'כל התמונות של האירוע יימחקו' : 'All photos for this event will be deleted', showCancelButton: true, confirmButtonColor: '#D4AF37', cancelButtonColor: '#333', confirmButtonText: he ? 'מחק' : 'Delete', cancelButtonText: he ? 'ביטול' : 'Cancel', background: '#0a0a0a', color: '#fff' });
+    const ev = events.find(e => e.id === id);
+    const result = await Swal.fire({ icon: 'warning', title: he ? 'למחוק אירוע?' : 'Delete event?', text: he ? `"${ev?.name}" וכל התמונות שלו יימחקו לצמיתות` : `"${ev?.name}" and all its photos will be permanently deleted`, showCancelButton: true, confirmButtonColor: '#D4AF37', cancelButtonColor: '#333', confirmButtonText: he ? 'מחק' : 'Delete', cancelButtonText: he ? 'ביטול' : 'Cancel', background: '#0a0a0a', color: '#fff' });
     if (!result.isConfirmed) return;
+    loader.start(he ? 'מוחק אירוע...' : 'Deleting event...');
     await api.deleteEvent(id);
+    loader.stop();
     loadEvents();
-    Swal.fire({ icon: 'success', title: he ? 'נמחק!' : 'Deleted!', timer: 1500, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
+    Swal.fire({ icon: 'success', title: he ? '🗑️ נמחק!' : '🗑️ Deleted!', timer: 1500, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
   };
 
   const handleToggle = async (id: string, active: boolean) => {
+    loader.start(active ? (he ? 'מכבה אירוע...' : 'Deactivating...') : (he ? 'מפעיל אירוע...' : 'Activating...'));
     await api.updateEvent(id, { active: !active });
+    loader.stop();
     loadEvents();
+    Swal.fire({ icon: 'success', title: !active ? (he ? '✅ האירוע הופעל' : '✅ Event activated') : (he ? '⏸ האירוע כובה' : '⏸ Event deactivated'), timer: 1500, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
   };
 
   if (loading) return <div className="flex justify-center py-12"><div className="w-8 h-8 rounded-full border-2 border-transparent animate-spin" style={{ borderTopColor: '#D4AF37', borderRightColor: '#D4AF37' }} /></div>;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      {loader.visible && loader.message && <BrandedLoader message={loader.message} />}
       {/* Language toggle switch */}
       <div className="glass-card p-4 mb-4 flex items-center justify-between">
         <div>
@@ -279,6 +372,7 @@ function OverlaysTab() {
   const [uploadEventId, setUploadEventId] = useState<string>('');
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const loader = useLoader();
 
   const loadData = () => {
     Promise.all([api.getOverlays(), api.getEvents()]).then(([ovs, evs]) => {
@@ -292,14 +386,11 @@ function OverlaysTab() {
 
   // Check if current user is super admin
   const storedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('auth-user') || '{}') : {};
-  const isSuperAdmin = storedUser.role === 'super_admin';
-
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files) return;
-    // Super admin uploads globally (no eventId), account manager needs eventId
-    if (!isSuperAdmin && !uploadEventId) return;
+    if (!files || files.length === 0) return;
     setUploading(true);
+    loader.start(he ? `מעלה ${files.length} מסגרות...` : `Uploading ${files.length} frame${files.length > 1 ? 's' : ''}...`);
 
     // Resize PNG to max 1080x1920 before upload (Vercel 4.5MB limit)
     const resizeFile = (file: File): Promise<File> => new Promise((resolve) => {
@@ -322,122 +413,86 @@ function OverlaysTab() {
       img.src = url;
     });
 
+    let uploaded = 0;
     for (let i = 0; i < files.length; i++) {
       const file = await resizeFile(files[i]);
       const name = files[i].name.replace(/\.[^.]+$/, '');
-      await api.uploadOverlay(file, name, isSuperAdmin ? undefined : uploadEventId);
+      await api.uploadOverlay(file, name, undefined); // global — no event
+      uploaded++;
     }
+    loader.stop();
     setUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
     loadData();
+    Swal.fire({
+      icon: 'success',
+      title: he ? '✅ הועלה בהצלחה!' : '✅ Uploaded!',
+      text: he ? `${uploaded} מסגרות נוספו למערכת` : `${uploaded} frame${uploaded > 1 ? 's' : ''} added successfully`,
+      timer: 2500, showConfirmButton: false,
+      background: '#0a0a0a', color: '#fff',
+    });
   };
 
   const handleDeleteOverlay = async (id: string) => {
-    const result = await Swal.fire({ icon: 'warning', title: he ? 'למחוק מסגרת?' : 'Delete overlay?', showCancelButton: true, confirmButtonColor: '#D4AF37', cancelButtonColor: '#333', confirmButtonText: he ? 'מחק' : 'Delete', cancelButtonText: he ? 'ביטול' : 'Cancel', background: '#0a0a0a', color: '#fff' });
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: he ? 'למחוק מסגרת?' : 'Delete overlay?',
+      text: he ? 'פעולה זו לא ניתנת לביטול' : 'This cannot be undone',
+      showCancelButton: true, confirmButtonColor: '#D4AF37', cancelButtonColor: '#333',
+      confirmButtonText: he ? 'מחק' : 'Delete', cancelButtonText: he ? 'ביטול' : 'Cancel',
+      background: '#0a0a0a', color: '#fff',
+    });
     if (!result.isConfirmed) return;
+    loader.start(he ? 'מוחק מסגרת...' : 'Deleting frame...');
     await api.deleteOverlay(id);
+    loader.stop();
     loadData();
+    Swal.fire({ icon: 'success', title: he ? 'נמחק!' : 'Deleted!', timer: 1500, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
   };
-
-  const filteredOverlays = selectedEventId
-    ? overlays.filter(o => o.eventId === selectedEventId)
-    : overlays;
 
   if (loading) return <div className="flex justify-center py-12"><div className="w-8 h-8 rounded-full border-2 border-transparent animate-spin" style={{ borderTopColor: '#D4AF37', borderRightColor: '#D4AF37' }} /></div>;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      {/* Upload section */}
+      {loader.visible && loader.message && <BrandedLoader message={loader.message} />}
+
+      {/* Upload button — global, no event selection */}
       <input ref={fileInputRef} type="file" accept="image/png" multiple className="hidden" onChange={handleUpload} />
-
-      {isSuperAdmin ? (
-        /* Super admin — simple upload button, no event selection */
-        <button
-          className="btn-glow w-full mb-5"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-        >
-          {uploading ? '⏳' : '+'} {he ? 'העלה מסגרות PNG (לכל האירועים)' : 'Upload PNG Overlays (All Events)'}
-        </button>
-      ) : (
-        /* Account manager — select event first */
-        <div className="glass-card p-4 mb-4">
-          <p className="text-xs text-white/50 mb-2">{he ? 'העלה מסגרות לאירוע:' : 'Upload frames for event:'}</p>
-          <div className="flex gap-2">
-            <select
-              value={uploadEventId}
-              onChange={(e) => setUploadEventId(e.target.value)}
-              className="flex-1 px-3 py-2.5 rounded-xl bg-white/8 border border-white/15 text-white text-sm focus:outline-none focus:border-primary"
-            >
-              <option value="">{he ? 'בחר אירוע...' : 'Select event...'}</option>
-              {events.map(ev => (
-                <option key={ev.id} value={ev.id}>{ev.name}</option>
-              ))}
-            </select>
-            <button
-              className="btn-glow px-4 text-sm"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading || !uploadEventId}
-              style={{ opacity: uploadEventId ? 1 : 0.4 }}
-            >
-              {uploading ? '⏳' : '+'} {he ? 'העלה' : 'Upload'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Filter by event */}
-      <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-        <button
-          className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${!selectedEventId ? 'bg-primary/20 text-primary' : 'bg-white/5 text-white/40'}`}
-          onClick={() => setSelectedEventId('')}
-        >
-          {he ? 'הכל' : 'All'} ({overlays.length})
-        </button>
-        {events.map(ev => {
-          const count = overlays.filter(o => o.eventId === ev.id).length;
-          return (
-            <button key={ev.id}
-              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${selectedEventId === ev.id ? 'bg-primary/20 text-primary' : 'bg-white/5 text-white/40'}`}
-              onClick={() => setSelectedEventId(ev.id)}
-            >
-              {ev.name} ({count})
-            </button>
-          );
-        })}
-      </div>
+      <button
+        className="btn-glow w-full mb-5"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={uploading}
+      >
+        {uploading ? '⏳' : '+'} {he ? 'העלה מסגרות PNG' : 'Upload PNG Frames'}
+      </button>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {filteredOverlays.map((overlay, i) => {
-          const eventName = events.find(e => e.id === overlay.eventId)?.name;
-          return (
-            <motion.div key={overlay.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.04 }}
-              className="glass-card overflow-hidden relative">
-              <div className="aspect-[3/4] relative">
-                <div className="absolute inset-0" style={{
-                  backgroundImage: 'repeating-conic-gradient(#0a0a0a 0% 25%, #1a1a1a 0% 50%)',
-                  backgroundSize: '12px 12px',
-                }} />
-                <img src={api.getOverlayImageUrl(overlay.id)} alt={overlay.name} className="relative w-full h-full object-contain p-1" loading="lazy" />
+        {overlays.map((overlay, i) => (
+          <motion.div key={overlay.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.04 }}
+            className="glass-card overflow-hidden relative">
+            <div className="aspect-[3/4] relative">
+              <div className="absolute inset-0" style={{
+                backgroundImage: 'repeating-conic-gradient(#0a0a0a 0% 25%, #1a1a1a 0% 50%)',
+                backgroundSize: '12px 12px',
+              }} />
+              <img src={api.getOverlayImageUrl(overlay.id)} alt={overlay.name} className="relative w-full h-full object-contain p-1" loading="lazy" />
+            </div>
+            <div className="p-2">
+              <p className="text-xs font-bold text-white/70 truncate">{overlay.name}</p>
+              <div className="flex justify-end mt-1">
+                <button className="w-6 h-6 rounded-full bg-red-500/15 text-red-400 flex items-center justify-center text-xs active:bg-red-500/30"
+                  onClick={() => handleDeleteOverlay(overlay.id)}>✕</button>
               </div>
-              <div className="p-2">
-                <p className="text-xs font-bold text-white/70 truncate">{overlay.name}</p>
-                {eventName && <p className="text-xs text-primary/50 truncate">{eventName}</p>}
-                <div className="flex justify-end mt-1">
-                  <button className="w-6 h-6 rounded-full bg-red-500/15 text-red-400 flex items-center justify-center text-xs active:bg-red-500/30"
-                    onClick={() => handleDeleteOverlay(overlay.id)}>✕</button>
-                </div>
-              </div>
-            </motion.div>
-          );
-        })}
+            </div>
+          </motion.div>
+        ))}
       </div>
 
-      {filteredOverlays.length === 0 && (
+      {overlays.length === 0 && (
         <div className="glass-card p-10 text-center">
           <span className="text-5xl block mb-3">🖼️</span>
-          <h3 className="text-lg font-bold text-white mb-1">{he ? 'אין מסגרות' : 'No overlays'}</h3>
-          <p className="text-sm text-white/40">{he ? 'בחר אירוע והעלה קבצי PNG' : 'Select an event and upload PNG files'}</p>
+          <h3 className="text-lg font-bold text-white mb-1">{he ? 'אין מסגרות עדיין' : 'No frames yet'}</h3>
+          <p className="text-sm text-white/40">{he ? 'העלה קבצי PNG' : 'Upload PNG files'}</p>
         </div>
       )}
     </motion.div>
