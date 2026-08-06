@@ -188,6 +188,15 @@ export const api = {
     return res.json();
   },
 
+  async updateLead(id: string, data: { handled: boolean }) {
+    const res = await fetch(`${BASE}/api/leads`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ id, ...data }),
+    });
+    return res.json();
+  },
+
   // Print batch (Dropbox)
   async sendToPrint(photoIds: string[]) {
     const res = await fetch(`${BASE}/api/print-batch`, {

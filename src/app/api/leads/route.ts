@@ -38,6 +38,27 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// PATCH /api/leads — auth required, update handled status
+export async function PATCH(req: NextRequest) {
+  try {
+    const user = await getUserFromRequest(req as unknown as Request);
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { id, handled } = await req.json();
+    if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+
+    const lead = await prisma.lead.update({
+      where: { id },
+      data: { handled: Boolean(handled) },
+    });
+
+    return NextResponse.json({ success: true, lead });
+  } catch (error) {
+    console.error('Lead update error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
 // GET /api/leads — auth required
 export async function GET(req: NextRequest) {
   try {
