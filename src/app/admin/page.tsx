@@ -639,7 +639,7 @@ function PhotosTab() {
               {pendingReview.map((photo) => (
                 <div key={photo.id} className="glass-card overflow-hidden border border-yellow-500/30">
                   <div className="relative bg-black">
-                    <img src={api.getPhotoImageUrl(photo.id)} alt="" className="w-full aspect-[3/4] object-cover" loading="lazy" />
+                    <img src={api.getPhotoImageUrl(photo.id)} alt="" className="w-full object-contain" loading="lazy" />
                     <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded-full bg-yellow-500/80 text-xs font-bold text-black">
                       {photo.moderationReason === 'suspicious_content' ? '🔍' : photo.moderationReason === 'low_face_confidence' ? '👤?' : '⚠️'}
                     </div>
@@ -700,7 +700,7 @@ function PhotosTab() {
                 className={`glass-card overflow-hidden transition-all ${isSelected ? 'ring-2 ring-primary' : ''}`}>
                 {/* Selectable photo */}
                 <div className="relative bg-black cursor-pointer" onClick={() => toggleSelect(photo.id)}>
-                    <img src={api.getPhotoImageUrl(photo.id)} alt="" className="w-full aspect-[3/4] object-cover" loading="lazy" />
+                    <img src={api.getPhotoImageUrl(photo.id)} alt="" className="w-full object-contain" loading="lazy" />
                   {/* Selection checkbox */}
                   <div className={`absolute top-2 right-2 w-6 h-6 rounded-full border-2 flex items-center justify-center z-20 ${isSelected ? 'bg-primary border-primary' : 'border-white/50 bg-black/30'}`}>
                     {isSelected && <span className="text-white text-xs font-bold">✓</span>}
