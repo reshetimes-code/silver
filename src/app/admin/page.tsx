@@ -84,7 +84,7 @@ function useLoader() {
 
   const start = useCallback((msg: string) => {
     setMessage(msg);
-    timerRef.current = setTimeout(() => setVisible(true), 2000);
+    setVisible(true);
   }, []);
 
   const stop = useCallback(() => {
