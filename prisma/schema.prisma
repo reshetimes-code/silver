@@ -18,6 +18,7 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   events       Event[]
+  leads        Lead[]
 
   @@index([email])
   @@index([role])
@@ -34,6 +35,7 @@ model Event {
   updatedAt          DateTime   @updatedAt
   photos             Photo[]
   overlays           Overlay[]
+  leads              Lead[]     @relation("LeadSourceEvent")
   owner              User?      @relation(fields: [ownerId], references: [id])
 
   @@index([ownerId])
@@ -71,4 +73,20 @@ model Photo {
   @@index([eventId])
   @@index([deviceId])
   @@index([phoneNumber])
+}
+
+model Lead {
+  id            String   @id @default(uuid())
+  name          String   @default("")
+  phone         String
+  eventDate     String
+  sourceEventId String?
+  ownerId       String?
+  createdAt     DateTime @default(now())
+
+  sourceEvent   Event?   @relation("LeadSourceEvent", fields: [sourceEventId], references: [id], onDelete: SetNull)
+  owner         User?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId])
+  @@index([phone])
 }

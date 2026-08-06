@@ -97,13 +97,14 @@ function useLoader() {
   return { visible, message, start, stop };
 }
 
-type Tab = 'events' | 'overlays' | 'photos' | 'users';
+type Tab = 'events' | 'overlays' | 'photos' | 'users' | 'leads';
 
 interface AuthUser { id: string; email: string; name: string; role: string; }
 interface EventData { id: string; name: string; date: string; maxPrintsPerDevice: number; active: boolean; owner?: { name: string; email: string }; }
 interface OverlayData { id: string; name: string; url: string; }
 interface PhotoData { id: string; eventId: string; photoUrl: string; overlayId: string | null; deviceId: string; phoneNumber: string; moderationStatus: string; moderationReason: string | null; printStatus: string; createdAt: string; event?: EventData; overlay?: OverlayData; }
 interface UserData { id: string; email: string; name: string; role: string; active: boolean; phone: string; createdAt: string; _count: { events: number }; }
+interface LeadData { id: string; name: string; phone: string; eventDate: string; sourceEventId: string | null; ownerId: string | null; createdAt: string; owner?: { name: string; email: string } | null; sourceEvent?: { name: string } | null; }
 
 export default function AdminPage() {
   const hydrated = useHydrated();
@@ -115,12 +116,22 @@ export default function AdminPage() {
 
   const isSuperAdmin = currentUser?.role === 'super_admin';
 
+  // Read ?tab= from URL on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get('tab');
+    if (t && ['events', 'overlays', 'photos', 'users', 'leads'].includes(t)) {
+      setTab(t as Tab);
+    }
+  }, []);
+
   if (!hydrated) return null;
 
   const tabs: { id: Tab; label: string; icon: string }[] = [
     { id: 'events', label: he ? 'אירועים' : 'Events', icon: '🎉' },
     { id: 'overlays', label: he ? 'מסגרות' : 'Overlays', icon: '🖼️' },
     { id: 'photos', label: he ? 'תמונות' : 'Photos', icon: '📸' },
+    { id: 'leads', label: he ? 'לידים' : 'Leads', icon: '💎' },
     ...(isSuperAdmin ? [{ id: 'users' as Tab, label: he ? 'משתמשים' : 'Users', icon: '👥' }] : []),
   ];
 
@@ -167,6 +178,7 @@ export default function AdminPage() {
           {tab === 'events' && <EventsTab key="events" />}
           {tab === 'overlays' && <OverlaysTab key="overlays" />}
           {tab === 'photos' && <PhotosTab key="photos" />}
+          {tab === 'leads' && <LeadsTab key="leads" />}
           {tab === 'users' && isSuperAdmin && <UsersTab key="users" />}
         </AnimatePresence>
       </div>
@@ -864,6 +876,141 @@ function UsersTab() {
           </div>
         )}
       </div>
+    </motion.div>
+  );
+}
+
+// ===================== LEADS TAB =====================
+function LeadsTab() {
+  const { locale } = useStore();
+  const he = locale === 'he';
+  const isRtl = locale === 'he';
+  const [leads, setLeads] = useState<LeadData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const storedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('auth-user') || '{}') : {};
+  const isSuperAdmin = storedUser.role === 'super_admin';
+
+  const loadLeads = () => {
+    api.getLeads().then((data: LeadData[]) => { setLeads(data); setLoading(false); }).catch(() => setLoading(false));
+  };
+
+  useEffect(() => { loadLeads(); }, []);
+
+  const openWhatsApp = (phone: string) => {
+    const cleaned = phone.replace(/[\s\-()]/g, '');
+    const waNum = cleaned.startsWith('0') ? '972' + cleaned.slice(1) : cleaned.replace('+', '');
+    window.open(`https://wa.me/${waNum}`, '_blank');
+  };
+
+  const callPhone = (phone: string) => {
+    window.location.href = `tel:${phone}`;
+  };
+
+  if (loading) {
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-center py-12">
+        <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+          className="w-8 h-8 rounded-full border-2 border-transparent" style={{ borderTopColor: '#D4AF37', borderRightColor: '#D4AF37' }} />
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-bold text-white">
+          {he ? 'לידים חדשים' : 'New Leads'}
+          <span className="text-xs text-white/30 font-normal ms-2">({leads.length})</span>
+        </h2>
+        <button
+          onClick={loadLeads}
+          className="text-xs text-white/40 hover:text-white/70 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 active:bg-white/10 transition-colors"
+        >
+          ↻ {he ? 'רענן' : 'Refresh'}
+        </button>
+      </div>
+
+      {leads.length === 0 ? (
+        <div className="glass-card p-10 text-center">
+          <span className="text-5xl block mb-3">💎</span>
+          <h3 className="text-lg font-bold text-white mb-2">{he ? 'אין לידים עדיין' : 'No leads yet'}</h3>
+          <p className="text-sm text-white/40 leading-relaxed">
+            {he
+              ? 'לידים יופיעו כאן כאשר אורחים יכנסו לפוטובות ויסכימו לקבל הצעה'
+              : 'Leads appear here when guests enter the photobooth and agree to receive an offer'}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3" dir={isRtl ? 'rtl' : 'ltr'}>
+          {leads.map((lead, i) => (
+            <motion.div
+              key={lead.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.04 }}
+              className="glass-card overflow-hidden"
+            >
+              <div className="h-0.5" style={{ background: 'linear-gradient(90deg, #D4AF37 0%, rgba(212,175,55,0.15) 60%, transparent 100%)' }} />
+              <div className="p-4 flex items-start justify-between gap-3">
+                {/* Lead info */}
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base font-bold text-white mb-0.5 truncate">
+                    {lead.name || (he ? 'ללא שם' : 'No name')}
+                  </h3>
+                  <p className="text-sm text-white/60 flex items-center gap-1.5 mb-1">
+                    <span>📱</span>
+                    <span dir="ltr">{lead.phone}</span>
+                  </p>
+                  <p className="text-sm flex items-center gap-1.5 mb-1" style={{ color: '#D4AF37' }}>
+                    <span>📅</span>
+                    {lead.eventDate.replace(/-/g, '.')}
+                  </p>
+                  {lead.sourceEvent && (
+                    <p className="text-xs text-white/30 flex items-center gap-1">
+                      <span>📷</span> {lead.sourceEvent.name}
+                    </p>
+                  )}
+                  {isSuperAdmin && lead.owner && (
+                    <p className="text-xs text-white/30 flex items-center gap-1 mt-0.5">
+                      <span>👤</span> {lead.owner.name}
+                    </p>
+                  )}
+                  <p className="text-[10px] text-white/20 mt-2">
+                    {new Date(lead.createdAt).toLocaleDateString(he ? 'he-IL' : 'en-US', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex flex-col gap-2 flex-shrink-0">
+                  {/* WhatsApp */}
+                  <button
+                    onClick={() => openWhatsApp(lead.phone)}
+                    title="WhatsApp"
+                    className="w-11 h-11 rounded-full flex items-center justify-center active:scale-90 transition-transform"
+                    style={{ background: 'rgba(37,211,102,0.12)', border: '1px solid rgba(37,211,102,0.25)' }}
+                  >
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="#25D166">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                    </svg>
+                  </button>
+                  {/* Call */}
+                  <button
+                    onClick={() => callPhone(lead.phone)}
+                    title={he ? 'התקשר' : 'Call'}
+                    className="w-11 h-11 rounded-full flex items-center justify-center active:scale-90 transition-transform"
+                    style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.25)' }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 13a19.79 19.79 0 01-3.07-8.67A2 2 0 012.18 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.91a16 16 0 006.06 6.06l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
     </motion.div>
   );
 }

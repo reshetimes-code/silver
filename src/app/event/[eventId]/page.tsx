@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useParams, useRouter } from 'next/navigation';
+import Swal from 'sweetalert2';
 import { useStore } from '@/lib/store';
 import { t } from '@/lib/i18n';
 import { useHydrated } from '@/lib/use-hydrated';
@@ -133,11 +134,143 @@ export default function CapturePhotoPage() {
     return /^0[0-9]{8,9}$/.test(cleaned) || /^\+?[0-9]{10,15}$/.test(cleaned);
   };
 
-  const handlePhoneSubmit = () => {
+  const markLeadSeen = (phone: string) => {
+    try { localStorage.setItem(`lead-asked-${phone}`, '1'); } catch { /* ignore */ }
+  };
+
+  const showLeadFlow = async (phone: string) => {
+    const swalBase = {
+      background: '#0a0a0a',
+      color: '#fff',
+      confirmButtonColor: '#D4AF37',
+      denyButtonColor: '#333333',
+      cancelButtonColor: '#333333',
+      allowOutsideClick: false,
+    };
+
+    // Step 1 — Celebrating soon?
+    const s1 = await Swal.fire({
+      ...swalBase,
+      title: he ? '🎉 רגע לפני שצולמים...' : '🎉 One moment before we start...',
+      text: he
+        ? 'האם אתם חוגגים אירוע בקרוב?'
+        : 'Are you celebrating an upcoming event?',
+      showConfirmButton: true,
+      showDenyButton: true,
+      confirmButtonText: he ? 'כן! 🎊' : 'Yes! 🎊',
+      denyButtonText: he ? 'לא' : 'No',
+    });
+
+    if (!s1.isConfirmed) {
+      markLeadSeen(phone);
+      return;
+    }
+
+    // Step 2 — Want an offer?
+    const s2 = await Swal.fire({
+      ...swalBase,
+      title: he ? '✨ מעניין!' : '✨ Interesting!',
+      text: he
+        ? 'תרצו שנחזור אליכם עם הצעה לפוטובות לאירוע שלכם?'
+        : 'Would you like to receive a photobooth offer for your event?',
+      showConfirmButton: true,
+      showDenyButton: true,
+      confirmButtonText: he ? 'בהחלט! 📸' : 'Absolutely! 📸',
+      denyButtonText: he ? 'לא, תודה' : 'No thanks',
+    });
+
+    if (!s2.isConfirmed) {
+      markLeadSeen(phone);
+      return;
+    }
+
+    // Step 3 — Collect name + event date
+    const inputStyle =
+      'background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);' +
+      'border-radius:10px;color:white;padding:10px 14px;width:100%;font-size:15px;' +
+      'outline:none;box-sizing:border-box;';
+
+    const formHtml = he
+      ? `<div dir="rtl" style="text-align:right;margin-top:8px;">
+          <p style="color:rgba(255,255,255,0.5);font-size:12px;margin-bottom:6px;">שם מלא</p>
+          <input id="swal-lead-name" type="text" placeholder="ישראל ישראלי"
+            style="${inputStyle}margin-bottom:14px;direction:rtl;" />
+          <p style="color:rgba(255,255,255,0.5);font-size:12px;margin-bottom:6px;">תאריך האירוע (משוער)</p>
+          <input id="swal-lead-date" type="date"
+            style="${inputStyle}color-scheme:dark;" />
+        </div>`
+      : `<div style="text-align:left;margin-top:8px;">
+          <p style="color:rgba(255,255,255,0.5);font-size:12px;margin-bottom:6px;">Full Name</p>
+          <input id="swal-lead-name" type="text" placeholder="John Smith"
+            style="${inputStyle}margin-bottom:14px;" />
+          <p style="color:rgba(255,255,255,0.5);font-size:12px;margin-bottom:6px;">Event Date (estimated)</p>
+          <input id="swal-lead-date" type="date"
+            style="${inputStyle}color-scheme:dark;" />
+        </div>`;
+
+    const s3 = await Swal.fire({
+      ...swalBase,
+      title: he ? '📅 נשמח ליצור איתכם קשר' : "📅 We'd love to get in touch",
+      html: formHtml,
+      showConfirmButton: true,
+      showCancelButton: true,
+      confirmButtonText: he ? 'שלח 🚀' : 'Send 🚀',
+      cancelButtonText: he ? 'ביטול' : 'Cancel',
+      preConfirm: () => {
+        const nameEl = document.getElementById('swal-lead-name') as HTMLInputElement;
+        const dateEl = document.getElementById('swal-lead-date') as HTMLInputElement;
+        const name = nameEl?.value?.trim() || '';
+        const date = dateEl?.value || '';
+        if (!date) {
+          Swal.showValidationMessage(he ? 'נא לבחור תאריך' : 'Please select a date');
+          return false;
+        }
+        return { name, date };
+      },
+    });
+
+    if (s3.isConfirmed && s3.value) {
+      try {
+        await api.createLead({
+          name: s3.value.name,
+          phone,
+          eventDate: s3.value.date,
+          eventId,
+        });
+      } catch (e) {
+        console.error('Lead submission failed:', e);
+      }
+
+      await Swal.fire({
+        ...swalBase,
+        title: he ? '🙏 תודה רבה!' : '🙏 Thank You!',
+        text: he
+          ? 'נציג מטעמנו יחזור אליכם בהקדם האפשרי ✨'
+          : 'One of our representatives will reach out to you soon! ✨',
+        icon: 'success',
+        confirmButtonText: he ? 'יאללה לצלם! 📸' : "Let's take photos! 📸",
+        iconColor: '#D4AF37',
+      });
+    }
+
+    markLeadSeen(phone);
+  };
+
+  const handlePhoneSubmit = async () => {
     if (!validatePhone(phoneInput)) {
       setPhoneError(true);
       return;
     }
+
+    // Show lead capture flow once per phone number
+    const alreadyAsked = (() => {
+      try { return localStorage.getItem(`lead-asked-${phoneInput}`); } catch { return null; }
+    })();
+
+    if (!alreadyAsked) {
+      await showLeadFlow(phoneInput);
+    }
+
     setGuestPhone(phoneInput);
     setMode('choose');
   };

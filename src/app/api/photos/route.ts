@@ -55,12 +55,10 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  // Auto-upload to Dropbox if approved (don't wait — fire and forget)
-  if (moderation.status === 'approved') {
-    uploadToDropbox(photo.id).catch((err) => {
-      console.error('Auto Dropbox upload failed:', err);
-    });
-  }
+  // Auto-upload to Dropbox — rejected photos already returned above, so always upload here
+  uploadToDropbox(photo.id).catch((err) => {
+    console.error('Auto Dropbox upload failed:', err);
+  });
 
   return NextResponse.json(photo);
 }

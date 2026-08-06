@@ -172,6 +172,22 @@ export const api = {
     }
   },
 
+  // ===== Leads =====
+  async createLead(data: { name: string; phone: string; eventDate: string; eventId: string }) {
+    const res = await fetch(`${BASE}/api/leads`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+
+  async getLeads() {
+    const res = await fetch(`${BASE}/api/leads`, { headers: authHeaders() });
+    if (!res.ok) return [];
+    return res.json();
+  },
+
   // Print batch (Dropbox)
   async sendToPrint(photoIds: string[]) {
     const res = await fetch(`${BASE}/api/print-batch`, {
