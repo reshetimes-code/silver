@@ -187,26 +187,38 @@ export default function CapturePhotoPage() {
 
     // Step 3 — Collect name + event date
     const inputStyle =
+      'display:block;width:100%;box-sizing:border-box;' +
       'background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);' +
-      'border-radius:10px;color:white;padding:10px 14px;width:100%;font-size:15px;' +
-      'outline:none;box-sizing:border-box;';
+      'border-radius:10px;color:white;padding:11px 14px;font-size:15px;' +
+      'outline:none;-webkit-appearance:none;appearance:none;';
+    const labelStyle =
+      'display:block;color:rgba(255,255,255,0.45);font-size:12px;margin-bottom:6px;';
+    const fieldStyle = 'margin-bottom:14px;';
 
     const formHtml = he
-      ? `<div dir="rtl" style="text-align:right;margin-top:8px;">
-          <p style="color:rgba(255,255,255,0.5);font-size:12px;margin-bottom:6px;">שם מלא</p>
-          <input id="swal-lead-name" type="text" placeholder="ישראל ישראלי"
-            style="${inputStyle}margin-bottom:14px;direction:rtl;" />
-          <p style="color:rgba(255,255,255,0.5);font-size:12px;margin-bottom:6px;">תאריך האירוע (משוער)</p>
-          <input id="swal-lead-date" type="date"
-            style="${inputStyle}color-scheme:dark;" />
+      ? `<div dir="rtl" style="text-align:right;">
+          <div style="${fieldStyle}">
+            <label style="${labelStyle}">שם מלא</label>
+            <input id="swal-lead-name" type="text" placeholder="ישראל ישראלי"
+              style="${inputStyle}direction:rtl;text-align:right;" />
+          </div>
+          <div>
+            <label style="${labelStyle}">תאריך האירוע (משוער)</label>
+            <input id="swal-lead-date" type="date"
+              style="${inputStyle}color-scheme:dark;" />
+          </div>
         </div>`
-      : `<div style="text-align:left;margin-top:8px;">
-          <p style="color:rgba(255,255,255,0.5);font-size:12px;margin-bottom:6px;">Full Name</p>
-          <input id="swal-lead-name" type="text" placeholder="John Smith"
-            style="${inputStyle}margin-bottom:14px;" />
-          <p style="color:rgba(255,255,255,0.5);font-size:12px;margin-bottom:6px;">Event Date (estimated)</p>
-          <input id="swal-lead-date" type="date"
-            style="${inputStyle}color-scheme:dark;" />
+      : `<div style="text-align:left;">
+          <div style="${fieldStyle}">
+            <label style="${labelStyle}">Your Full Name</label>
+            <input id="swal-lead-name" type="text" placeholder="John Smith"
+              style="${inputStyle}" />
+          </div>
+          <div>
+            <label style="${labelStyle}">Event Date (estimated)</label>
+            <input id="swal-lead-date" type="date"
+              style="${inputStyle}color-scheme:dark;" />
+          </div>
         </div>`;
 
     const s3 = await Swal.fire({
