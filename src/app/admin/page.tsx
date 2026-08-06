@@ -1034,7 +1034,7 @@ function LeadsTab() {
                   <span className="text-white/20 text-xs">|</span>
                   <span className="text-white/55 text-sm" dir="ltr">{lead.phone}</span>
                   <span className="text-white/20 text-xs">|</span>
-                  <span className="text-sm font-medium" style={{ color: '#D4AF37' }}>{lead.eventDate.replace(/-/g, '.')}</span>
+                  <span className="text-sm font-medium" style={{ color: '#D4AF37' }}>{lead.eventDate.split('-').reverse().join('.')}</span>
                   {lead.sourceEvent && (
                     <>
                       <span className="text-white/20 text-xs">|</span>
