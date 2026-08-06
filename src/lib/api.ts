@@ -197,6 +197,25 @@ export const api = {
     return res.json();
   },
 
+  async checkLeadExists(phone: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${BASE}/api/leads?phone=${encodeURIComponent(phone)}`);
+      if (!res.ok) return false;
+      const data = await res.json();
+      return !!data.exists;
+    } catch {
+      return false;
+    }
+  },
+
+  async deleteLead(id: string) {
+    await fetch(`${BASE}/api/leads`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ id }),
+    });
+  },
+
   // Print batch (Dropbox)
   async sendToPrint(photoIds: string[]) {
     const res = await fetch(`${BASE}/api/print-batch`, {

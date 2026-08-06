@@ -134,8 +134,9 @@ export default function CapturePhotoPage() {
     return /^0[0-9]{8,9}$/.test(cleaned) || /^\+?[0-9]{10,15}$/.test(cleaned);
   };
 
-  const markLeadSeen = (phone: string) => {
-    try { localStorage.setItem(`lead-asked-${phone}`, '1'); } catch { /* ignore */ }
+  // Session-level cache — avoids repeating the flow in the same browser session
+  const markLeadSeenThisSession = (phone: string) => {
+    try { sessionStorage.setItem(`lead-asked-${phone}`, '1'); } catch { /* ignore */ }
   };
 
   const showLeadFlow = async (phone: string) => {
@@ -162,7 +163,7 @@ export default function CapturePhotoPage() {
     });
 
     if (!s1.isConfirmed) {
-      markLeadSeen(phone);
+      markLeadSeenThisSession(phone);
       return;
     }
 
@@ -180,7 +181,7 @@ export default function CapturePhotoPage() {
     });
 
     if (!s2.isConfirmed) {
-      markLeadSeen(phone);
+      markLeadSeenThisSession(phone);
       return;
     }
 
@@ -253,7 +254,7 @@ export default function CapturePhotoPage() {
       });
     }
 
-    markLeadSeen(phone);
+    markLeadSeenThisSession(phone);
   };
 
   const handlePhoneSubmit = async () => {
@@ -262,13 +263,19 @@ export default function CapturePhotoPage() {
       return;
     }
 
-    // Show lead capture flow once per phone number
-    const alreadyAsked = (() => {
-      try { return localStorage.getItem(`lead-asked-${phoneInput}`); } catch { return null; }
+    // 1. Session cache — skip if already asked this session
+    const askedThisSession = (() => {
+      try { return sessionStorage.getItem(`lead-asked-${phoneInput}`); } catch { return null; }
     })();
 
-    if (!alreadyAsked) {
-      await showLeadFlow(phoneInput);
+    if (!askedThisSession) {
+      // 2. Check DB — skip if lead already exists (even across sessions)
+      const leadExists = await api.checkLeadExists(phoneInput);
+      if (!leadExists) {
+        await showLeadFlow(phoneInput);
+      } else {
+        markLeadSeenThisSession(phoneInput); // cache for this session
+      }
     }
 
     setGuestPhone(phoneInput);

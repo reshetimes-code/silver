@@ -925,6 +925,36 @@ function LeadsTab() {
     setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, handled: next } : l));
   };
 
+  const handleDeleteLead = async (lead: LeadData) => {
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: he ? 'למחוק ליד?' : 'Delete lead?',
+      html: he
+        ? `<p style="color:rgba(255,255,255,0.6);font-size:14px;">הליד של <b style="color:white">${lead.name || lead.phone}</b> יימחק לצמיתות.<br/>המשתמש יוכל להשאיר פרטים שוב בפוטובות.</p>`
+        : `<p style="color:rgba(255,255,255,0.6);font-size:14px;">Lead for <b style="color:white">${lead.name || lead.phone}</b> will be permanently deleted.<br/>The user will be able to submit details again.</p>`,
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#333',
+      confirmButtonText: he ? '🗑️ מחק' : '🗑️ Delete',
+      cancelButtonText: he ? 'ביטול' : 'Cancel',
+      background: '#0a0a0a',
+      color: '#fff',
+    });
+    if (!result.isConfirmed) return;
+
+    await api.deleteLead(lead.id);
+    setLeads(prev => prev.filter(l => l.id !== lead.id));
+    Swal.fire({
+      icon: 'success',
+      title: he ? 'נמחק!' : 'Deleted!',
+      text: he ? 'המשתמש יוכל להשאיר פרטים שוב' : 'The user can now submit details again',
+      timer: 2000,
+      showConfirmButton: false,
+      background: '#0a0a0a',
+      color: '#fff',
+    });
+  };
+
   if (loading) {
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-center py-12">
@@ -1035,6 +1065,14 @@ function LeadsTab() {
                     style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.25)' }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 13a19.79 19.79 0 01-3.07-8.67A2 2 0 012.18 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.91a16 16 0 006.06 6.06l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/>
+                    </svg>
+                  </button>
+                  {/* Delete */}
+                  <button onClick={() => handleDeleteLead(lead)} title={he ? 'מחק' : 'Delete'}
+                    className="w-9 h-9 rounded-full flex items-center justify-center active:scale-90 transition-transform"
+                    style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
                     </svg>
                   </button>
                 </div>
