@@ -300,9 +300,31 @@ function OverlaysTab() {
     // Super admin uploads globally (no eventId), account manager needs eventId
     if (!isSuperAdmin && !uploadEventId) return;
     setUploading(true);
+
+    // Resize PNG to max 1080x1920 before upload (Vercel 4.5MB limit)
+    const resizeFile = (file: File): Promise<File> => new Promise((resolve) => {
+      const MAX_W = 1080, MAX_H = 1920;
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const ratio = Math.min(MAX_W / img.width, MAX_H / img.height, 1);
+        const w = Math.round(img.width * ratio);
+        const h = Math.round(img.height * ratio);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+        canvas.toBlob((blob) => {
+          resolve(blob ? new File([blob], file.name, { type: 'image/png' }) : file);
+        }, 'image/png');
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+
     for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const name = file.name.replace(/\.[^.]+$/, '');
+      const file = await resizeFile(files[i]);
+      const name = files[i].name.replace(/\.[^.]+$/, '');
       await api.uploadOverlay(file, name, isSuperAdmin ? undefined : uploadEventId);
     }
     setUploading(false);
