@@ -668,6 +668,35 @@ export default function CapturePhotoPage() {
           </motion.button>
         </motion.div>
         <Footer compact />
+
+        {/* Fixed Share Button */}
+        <button
+          onClick={() => {
+            const url = window.location.href;
+            if (navigator.share) {
+              navigator.share({ title: event.name, url });
+            } else {
+              navigator.clipboard.writeText(url).then(() => {
+                Swal.fire({ icon: 'success', title: he ? 'הקישור הועתק!' : 'Link copied!', timer: 1500, showConfirmButton: false, background: '#1a1a2e', color: '#fff' });
+              });
+            }
+          }}
+          style={{
+            position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
+            zIndex: 100, display: 'flex', alignItems: 'center', gap: '8px',
+            padding: '12px 24px', borderRadius: '50px',
+            background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.35)',
+            color: '#D4AF37', fontSize: '14px', fontWeight: 700, cursor: 'pointer',
+            backdropFilter: 'blur(10px)', boxShadow: '0 4px 20px rgba(212,175,55,0.15)',
+            transition: 'all 0.2s',
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+          </svg>
+          {he ? 'שתף את הפוטובות' : 'Share Photobooth'}
+        </button>
       </div>
     );
   }
