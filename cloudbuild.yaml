@@ -33,7 +33,7 @@ steps:
       - '--cpu=1'
       - '--min-instances=0'
       - '--max-instances=10'
-      - '--add-cloudsql-instances=$PROJECT_ID:us-central1:silver-db'
+      - '--add-cloudsql-instances=$PROJECT_ID:us-central1:photobooth-db'
       - '--set-env-vars=NODE_ENV=production'
 
 images:
