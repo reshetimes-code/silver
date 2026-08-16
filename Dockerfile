@@ -11,8 +11,8 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npx prisma generate
-RUN npm run build
+# Generate Prisma client + build Next.js (skip prisma db push — runs separately on first deploy)
+RUN npx prisma generate && npx next build
 
 # Production
 FROM base AS runner
