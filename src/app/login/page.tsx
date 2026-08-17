@@ -52,7 +52,33 @@ export default function LoginPage() {
   };
 
   useEffect(() => {
-    window.handleGoogleCredential = (response) => handleGoogleLogin(response.credential);
+    const GOOGLE_CLIENT_ID = '1007500230578-edkmhl9fu4r7ontgllor0p403sejkom6.apps.googleusercontent.com';
+
+    const initGoogle = () => {
+      if (!window.google?.accounts?.id) return;
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: (response: { credential: string }) => handleGoogleLogin(response.credential),
+      });
+      const btn = document.getElementById('google-signin-btn');
+      if (btn) {
+        window.google.accounts.id.renderButton(btn, {
+          type: 'standard',
+          theme: 'filled_black',
+          size: 'large',
+          width: 300,
+        });
+      }
+    };
+
+    if (window.google?.accounts?.id) {
+      initGoogle();
+    } else {
+      const interval = setInterval(() => {
+        if (window.google?.accounts?.id) { clearInterval(interval); initGoogle(); }
+      }, 200);
+      return () => clearInterval(interval);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -176,22 +202,7 @@ export default function LoginPage() {
         </div>
 
         {/* Google Sign-In */}
-        <div
-          id="g_id_onload"
-          data-client_id="1007500230578-edkmhl9fu4r7ontgllor0p403sejkom6.apps.googleusercontent.com"
-          data-callback="handleGoogleCredential"
-          data-auto_prompt="false"
-        />
-        <div
-          className="g_id_signin w-full"
-          data-type="standard"
-          data-shape="rectangular"
-          data-theme="filled_black"
-          data-text={he ? 'signin_with' : 'signin_with'}
-          data-size="large"
-          data-logo_alignment="left"
-          data-width="300"
-        />
+        <div id="google-signin-btn" className="w-full flex justify-center" />
 
         <p className="text-center text-[10px] text-white/20 mt-4">
           {mode === 'login'
