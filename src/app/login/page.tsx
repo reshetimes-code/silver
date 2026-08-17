@@ -190,7 +190,7 @@ export default function LoginPage() {
           data-text={he ? 'signin_with' : 'signin_with'}
           data-size="large"
           data-logo_alignment="left"
-          data-width="100%"
+          data-width="300"
         />
 
         <p className="text-center text-[10px] text-white/20 mt-4">
