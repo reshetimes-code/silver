@@ -178,7 +178,7 @@ export default function LoginPage() {
         {/* Google Sign-In */}
         <div
           id="g_id_onload"
-          data-client_id={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+          data-client_id="1007500230578-edkmhl9fu4r7ontgllor0p403sejkom6.apps.googleusercontent.com"
           data-callback="handleGoogleCredential"
           data-auto_prompt="false"
         />
