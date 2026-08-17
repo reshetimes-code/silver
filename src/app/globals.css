@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+* {
+  font-family: var(--font-assistant), var(--font-geist-sans), sans-serif;
+}
+
 :root {
   --background: #000000;
   --foreground: #ffffff;
