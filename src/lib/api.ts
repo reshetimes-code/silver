@@ -43,6 +43,24 @@ export const api = {
     return result;
   },
 
+  async googleAuth(credential: string) {
+    const res = await fetch(`${BASE}/api/auth/google`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Google auth failed');
+    }
+    const result = await res.json();
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('auth-token', result.token);
+      localStorage.setItem('auth-user', JSON.stringify(result.user));
+    }
+    return result;
+  },
+
   async getMe() {
     const res = await fetch(`${BASE}/api/auth/me`, { headers: authHeaders() });
     if (!res.ok) return null;

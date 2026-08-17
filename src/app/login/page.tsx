@@ -3,12 +3,28 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import Script from 'next/script';
 import { useStore } from '@/lib/store';
 import { useHydrated } from '@/lib/use-hydrated';
 import { api } from '@/lib/api';
 import Logo from '@/components/ui/Logo';
 import ParticleBackground from '@/components/ui/ParticleBackground';
 import Link from 'next/link';
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: object) => void;
+          renderButton: (el: HTMLElement, config: object) => void;
+          prompt: () => void;
+        };
+      };
+    };
+    handleGoogleCredential?: (response: { credential: string }) => void;
+  }
+}
 
 export default function LoginPage() {
   const hydrated = useHydrated();
@@ -23,6 +39,22 @@ export default function LoginPage() {
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const handleGoogleLogin = async (credential: string) => {
+    setError('');
+    try {
+      setLoading(true);
+      await api.googleAuth(credential);
+      router.push('/dashboard');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Google login failed');
+    } finally { setLoading(false); }
+  };
+
+  useEffect(() => {
+    window.handleGoogleCredential = (response) => handleGoogleLogin(response.credential);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // If already logged in, redirect to dashboard
   useEffect(() => {
@@ -63,6 +95,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-dvh relative flex flex-col items-center justify-center px-5 bg-black" dir={locale === 'he' ? 'rtl' : 'ltr'}>
+      <Script src="https://accounts.google.com/gsi/client" strategy="lazyOnload" />
       <ParticleBackground />
 
       <motion.div
@@ -134,6 +167,31 @@ export default function LoginPage() {
         >
           {loading ? (he ? 'רגע...' : 'Please wait...') : mode === 'login' ? (he ? 'התחבר' : 'Login') : (he ? 'צור חשבון' : 'Create Account')}
         </button>
+
+        {/* Divider */}
+        <div className="flex items-center gap-3 my-4">
+          <div className="flex-1 h-px bg-white/10" />
+          <span className="text-white/25 text-xs">{he ? 'או' : 'or'}</span>
+          <div className="flex-1 h-px bg-white/10" />
+        </div>
+
+        {/* Google Sign-In */}
+        <div
+          id="g_id_onload"
+          data-client_id={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+          data-callback="handleGoogleCredential"
+          data-auto_prompt="false"
+        />
+        <div
+          className="g_id_signin w-full"
+          data-type="standard"
+          data-shape="rectangular"
+          data-theme="filled_black"
+          data-text={he ? 'signin_with' : 'signin_with'}
+          data-size="large"
+          data-logo_alignment="left"
+          data-width="100%"
+        />
 
         <p className="text-center text-[10px] text-white/20 mt-4">
           {mode === 'login'
