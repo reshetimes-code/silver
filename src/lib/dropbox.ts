@@ -128,7 +128,7 @@ export async function uploadToDropbox(photoId: string): Promise<{ success: boole
       photo.overlay?.url || null
     );
 
-    const safeEventName = photo.event.name.replace(/[^\x20-\x7E]/g, '').replace(/[/\\:*?"<>|]/g, '_').trim() || 'Event';
+    const safeEventName = photo.event.name.replace(/[/\\:*?"<>|]/g, '_').trim() || 'Event';
     const eventFolder = `${dropboxFolder}/${safeEventName}`;
     const fileName = `photo_${photo.id.slice(0, 8)}_${Date.now()}.jpg`;
     const filePath = `${eventFolder}/${fileName}`;

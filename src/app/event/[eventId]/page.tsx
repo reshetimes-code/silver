@@ -152,7 +152,7 @@ export default function CapturePhotoPage() {
     // Step 1 — Celebrating soon?
     const s1 = await Swal.fire({
       ...swalBase,
-      title: he ? '🎉 רגע לפני שצולמים...' : '🎉 One moment before we start...',
+      title: he ? '🎉 רגע לפני שמצלמים...' : '🎉 One moment before we start...',
       text: he
         ? 'האם אתם חוגגים אירוע בקרוב?'
         : 'Are you celebrating an upcoming event?',
