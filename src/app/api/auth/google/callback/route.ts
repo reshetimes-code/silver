@@ -6,18 +6,19 @@ import { createToken } from '@/lib/auth';
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!;
 
+const PUBLIC_URL = 'https://photobooth-qr-1007500230578.us-central1.run.app';
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
   const error = searchParams.get('error');
 
   if (error || !code) {
-    return NextResponse.redirect(new URL('/login?error=google_cancelled', request.url));
+    return NextResponse.redirect(`${PUBLIC_URL}/login?error=google_cancelled`);
   }
 
   try {
-    const origin = new URL(request.url).origin;
-    const redirectUri = `${origin}/api/auth/google/callback`;
+    const redirectUri = `${PUBLIC_URL}/api/auth/google/callback`;
 
     const client = new OAuth2Client(CLIENT_ID, CLIENT_SECRET, redirectUri);
     const { tokens } = await client.getToken(code);
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
 
     const payload = ticket.getPayload();
     if (!payload?.email) {
-      return NextResponse.redirect(new URL('/login?error=invalid_token', request.url));
+      return NextResponse.redirect(`${PUBLIC_URL}/login?error=invalid_token`);
     }
 
     const { email, name, sub: googleId } = payload;
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
     const token = createToken(user);
 
     // Redirect to dashboard with token
-    const response = NextResponse.redirect(new URL('/auth/google-callback', request.url));
+    const response = NextResponse.redirect(`${PUBLIC_URL}/auth/google-callback`);
     response.cookies.set('auth-token', token, {
       httpOnly: false,
       secure: true,
@@ -62,6 +63,6 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (err) {
     console.error('Google callback error:', err);
-    return NextResponse.redirect(new URL('/login?error=google_failed', request.url));
+    return NextResponse.redirect(`${PUBLIC_URL}/login?error=google_failed`);
   }
 }
