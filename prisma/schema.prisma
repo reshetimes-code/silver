@@ -31,6 +31,7 @@ model Event {
   maxPrintsPerDevice Int        @default(5)
   active             Boolean    @default(true)
   ownerId            String?
+  dropboxPath        String?
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
   photos             Photo[]

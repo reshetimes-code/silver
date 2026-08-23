@@ -42,6 +42,51 @@ async function getAccessToken(): Promise<string> {
 }
 
 /**
+ * Creates a Dropbox folder for a new event right away (instead of waiting for
+ * the first photo upload to lazily create it). Returns the folder path to
+ * store on the event so all future photos land in exactly this folder even
+ * if the event is later renamed. Returns null (never throws) if Dropbox
+ * isn't reachable — event creation should still succeed either way.
+ */
+export async function createEventDropboxFolder(eventName: string): Promise<string | null> {
+  try {
+    const accessToken = await getAccessToken();
+
+    let dropboxFolder = process.env.DROPBOX_FOLDER || '/BeautifulPhotobooth/SelphieBooth/Computer1';
+    if (!dropboxFolder.startsWith('/')) dropboxFolder = '/' + dropboxFolder;
+
+    const safeEventName = eventName.replace(/[/\\:*?"<>|]/g, '_').trim() || 'Event';
+    const eventFolder = `${dropboxFolder}/${safeEventName}`;
+
+    const res = await fetch('https://api.dropboxapi.com/2/files/create_folder_v2', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ path: eventFolder, autorename: false }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return data.metadata.path_display || eventFolder;
+    }
+
+    // Folder already exists (e.g. duplicate event name) — that's fine, reuse it.
+    const err = await res.json().catch(() => null);
+    if (err?.error?.['.tag'] === 'path' && err.error.path?.['.tag'] === 'conflict') {
+      return eventFolder;
+    }
+
+    console.error('Dropbox create_folder_v2 failed:', err || (await res.text()));
+    return null;
+  } catch (error) {
+    console.error('Failed to create Dropbox folder for event:', error);
+    return null;
+  }
+}
+
+/**
  * Smart composite: detects the transparent window in the overlay PNG,
  * then fits the photo INTO that window (not behind the entire frame).
  * This ensures the photo is visible and faces aren't hidden behind opaque borders.
@@ -113,9 +158,6 @@ export async function uploadToDropbox(photoId: string): Promise<{ success: boole
   try {
     const accessToken = await getAccessToken();
 
-    let dropboxFolder = process.env.DROPBOX_FOLDER || '/BeautifulPhotobooth/SelphieBooth/Computer1';
-    if (!dropboxFolder.startsWith('/')) dropboxFolder = '/' + dropboxFolder;
-
     const photo = await prisma.photo.findUnique({
       where: { id: photoId },
       include: { event: true, overlay: true },
@@ -128,8 +170,16 @@ export async function uploadToDropbox(photoId: string): Promise<{ success: boole
       photo.overlay?.url || null
     );
 
-    const safeEventName = photo.event.name.replace(/[/\\:*?"<>|]/g, '_').trim() || 'Event';
-    const eventFolder = `${dropboxFolder}/${safeEventName}`;
+    // Use the folder created (and stored) at event-creation time so photos always
+    // land together even if the event was renamed since. Older events created
+    // before this field existed fall back to computing the path from the name.
+    let eventFolder = photo.event.dropboxPath;
+    if (!eventFolder) {
+      let dropboxFolder = process.env.DROPBOX_FOLDER || '/BeautifulPhotobooth/SelphieBooth/Computer1';
+      if (!dropboxFolder.startsWith('/')) dropboxFolder = '/' + dropboxFolder;
+      const safeEventName = photo.event.name.replace(/[/\\:*?"<>|]/g, '_').trim() || 'Event';
+      eventFolder = `${dropboxFolder}/${safeEventName}`;
+    }
     const fileName = `photo_${photo.id.slice(0, 8)}_${Date.now()}.jpg`;
     const filePath = `${eventFolder}/${fileName}`;
 

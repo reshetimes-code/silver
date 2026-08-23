@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getUserFromRequest, isSuperAdmin } from '@/lib/auth';
+import { createEventDropboxFolder } from '@/lib/dropbox';
 
 export async function GET(request: NextRequest) {
   const user = await getUserFromRequest(request);
@@ -46,5 +47,15 @@ export async function POST(request: NextRequest) {
       ownerId: user?.id || null,
     },
   });
+
+  // Create the Dropbox folder right away so it exists before any photos are
+  // taken. Best-effort: if Dropbox is unreachable, the event still gets
+  // created and the folder falls back to being created lazily on first upload.
+  const dropboxPath = await createEventDropboxFolder(event.name);
+  if (dropboxPath) {
+    await prisma.event.update({ where: { id: event.id }, data: { dropboxPath } });
+    event.dropboxPath = dropboxPath;
+  }
+
   return NextResponse.json(event);
 }
