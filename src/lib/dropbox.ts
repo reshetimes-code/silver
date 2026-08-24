@@ -6,6 +6,23 @@ import { detectTransparentArea } from './overlay-fit';
 let cachedAccessToken: string | null = null;
 let tokenExpiresAt = 0;
 
+/**
+ * Dropbox requires the `Dropbox-API-Arg` header value to be pure ASCII (HTTP
+ * headers can't carry raw UTF-8/Unicode — the Fetch API throws
+ * "Cannot convert argument to a ByteString" for any character above 255).
+ * Event/file names are often Hebrew or contain smart-quotes, so escape any
+ * non-ASCII character as a unicode escape sequence — Dropbox's API parses
+ * that back as normal JSON, decoding to the correct Unicode path server-side.
+ * https://www.dropbox.com/developers/reference/json-encoding
+ */
+function asciiSafeJson(obj: unknown): string {
+  const nonAscii = new RegExp('[' + String.fromCharCode(128) + '-' + String.fromCharCode(65535) + ']', 'g');
+  return JSON.stringify(obj).replace(nonAscii, (c) => {
+    const hex = c.charCodeAt(0).toString(16);
+    return String.fromCharCode(92) + 'u' + '0000'.slice(hex.length) + hex;
+  });
+}
+
 async function getAccessToken(): Promise<string> {
   if (cachedAccessToken && Date.now() < tokenExpiresAt) {
     return cachedAccessToken;
@@ -187,7 +204,7 @@ export async function uploadToDropbox(photoId: string): Promise<{ success: boole
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
-        'Dropbox-API-Arg': JSON.stringify({ path: filePath, mode: 'add', autorename: true, mute: false }),
+        'Dropbox-API-Arg': asciiSafeJson({ path: filePath, mode: 'add', autorename: true, mute: false }),
         'Content-Type': 'application/octet-stream',
       },
       body: new Uint8Array(finalBuffer),

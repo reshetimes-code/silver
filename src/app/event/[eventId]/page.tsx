@@ -763,7 +763,14 @@ export default function CapturePhotoPage() {
 
           {/* Top overlay: timer + prints remaining */}
           <div className="absolute top-0 left-0 right-0 z-20 p-4 flex items-center justify-between"
-            style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.55) 0%, transparent 100%)', opacity: countdown !== null ? 0.3 : 1, pointerEvents: countdown !== null ? 'none' : 'auto' }}>
+            style={{
+              background: 'linear-gradient(180deg, rgba(0,0,0,0.55) 0%, transparent 100%)',
+              opacity: countdown !== null ? 0.3 : 1,
+              pointerEvents: countdown !== null ? 'none' : 'auto',
+              // Push below the phone's notch/status bar/camera cutout — otherwise
+              // the timer buttons sit under it and can't be tapped.
+              paddingTop: 'calc(1rem + var(--safe-top, 0px))',
+            }}>
             <div className="flex items-center gap-1.5">
               {TIMER_OPTIONS.map((sec) => (
                 <button key={sec}
