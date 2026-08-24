@@ -44,6 +44,27 @@ export default function LoginPage() {
     }
   }, [router]);
 
+  // The API throws with a short English code from the server (e.g.
+  // "Invalid credentials", "Account disabled") — map the ones we know to a
+  // clear, localized, actionable message instead of leaking raw English at
+  // Hebrew-locale users; fall back to the raw message for anything unknown
+  // so the user still gets something specific rather than nothing.
+  const describeAuthError = (message: string) => {
+    switch (message) {
+      case 'Invalid credentials':
+        return he ? 'אימייל או סיסמה שגויים. בדוק ונסה שוב.' : 'Wrong email or password. Check and try again.';
+      case 'Account disabled':
+        return he ? 'החשבון הזה מושבת. פנה למנהל המערכת.' : 'This account is disabled. Contact your admin.';
+      case 'Email already registered':
+        return he ? 'כבר יש חשבון עם האימייל הזה. נסה להתחבר במקום.' : 'An account with this email already exists. Try logging in instead.';
+      case 'Email and password required':
+      case 'Email, password, and name are required':
+        return he ? 'נא למלא את כל השדות המסומנים בכוכבית' : 'Please fill in all required fields';
+      default:
+        return message || (he ? 'משהו השתבש. בדוק את החיבור לאינטרנט ונסה שוב.' : 'Something went wrong. Check your internet connection and try again.');
+    }
+  };
+
   const handleLogin = async () => {
     setError('');
     if (!email || !password) { setError(he ? 'נא למלא את כל השדות' : 'Please fill in all fields'); return; }
@@ -52,7 +73,7 @@ export default function LoginPage() {
       await api.login(email.trim(), password);
       router.push('/dashboard');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      setError(describeAuthError(err instanceof Error ? err.message : ''));
     } finally { setLoading(false); }
   };
 
@@ -65,7 +86,7 @@ export default function LoginPage() {
       await api.register({ email: email.trim(), password, name: name.trim(), phone: phone.trim() });
       router.push('/dashboard');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
+      setError(describeAuthError(err instanceof Error ? err.message : ''));
     } finally { setLoading(false); }
   };
 

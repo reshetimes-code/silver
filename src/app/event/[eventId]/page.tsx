@@ -113,6 +113,11 @@ export default function CapturePhotoPage() {
     api.getEvent(eventId).then((data) => {
       setEvent(data);
       setLoading(false);
+    }).catch(() => {
+      // Network/server failure fetching the event — treat the same as "not
+      // found" below rather than leaving the loading spinner stuck forever.
+      setEvent(null);
+      setLoading(false);
     });
   }, [eventId]);
 
@@ -553,15 +558,26 @@ export default function CapturePhotoPage() {
 
   if (!event) {
     return (
-      <div className="min-h-dvh flex items-center justify-center px-5">
+      <div className="min-h-dvh flex items-center justify-center px-5" dir={isRtl ? 'rtl' : 'ltr'}>
+        <ParticleBackground />
+        <LanguageToggle />
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="glass-card p-8 text-center"
+          className="glass-card p-8 text-center max-w-sm relative z-10"
         >
-          <span className="text-5xl block mb-3">😕</span>
-          <h2 className="text-xl font-bold text-white mb-2">{t(locale, 'error')}</h2>
-          <p className="text-sm text-white/50">Event not found</p>
+          <span className="text-5xl block mb-4">😕</span>
+          <h2 className="text-xl font-bold text-white mb-3">
+            {he ? 'האירוע הזה כבר לא קיים' : 'This event no longer exists'}
+          </h2>
+          <p className="text-sm text-white/50 mb-5">
+            {he
+              ? 'הקישור שגוי, או שהאירוע נמחק. פנה למארגן האירוע לקבלת קישור מעודכן.'
+              : 'The link is wrong, or the event was deleted. Ask the event organizer for an updated link.'}
+          </p>
+          <button className="btn-secondary w-full" onClick={() => router.push('/')}>
+            {he ? 'חזרה לדף הבית' : 'Back to Home'}
+          </button>
         </motion.div>
       </div>
     );

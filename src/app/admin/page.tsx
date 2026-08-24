@@ -13,6 +13,39 @@ import AdminAuth from '@/components/ui/AdminAuth';
 import ParticleBackground from '@/components/ui/ParticleBackground';
 import Link from 'next/link';
 
+/**
+ * Every admin action (save/delete/upload/etc.) used to just `await` the API
+ * call with no try/catch. If it failed — network drop, server error, a
+ * validation error the API rejected — the user got nothing: no message, and
+ * for loader-wrapped actions the full-screen spinner never went away, so
+ * they were stuck with no way to know what happened or what to do next.
+ * Wrap any admin action in this so a failure always surfaces a clear,
+ * actionable message instead of a silent hang.
+ */
+async function showActionError(err: unknown) {
+  console.error(err);
+  const locale = useStore.getState().locale;
+  const he = locale === 'he';
+  const detail = err instanceof Error && err.message ? err.message : '';
+  await Swal.fire({
+    icon: 'error',
+    title: he ? 'הפעולה נכשלה' : 'Action failed',
+    text: he
+      ? `${detail ? detail + '. ' : ''}בדוק את החיבור לאינטרנט ונסה שוב. אם זה ממשיך לקרות, פנה לתמיכה.`
+      : `${detail ? detail + '. ' : ''}Check your internet connection and try again. If this keeps happening, contact support.`,
+    background: '#0a0a0a', color: '#fff', confirmButtonColor: '#D4AF37',
+  });
+}
+
+async function withErrorAlert<T>(fn: () => Promise<T>): Promise<T | undefined> {
+  try {
+    return await fn();
+  } catch (err) {
+    await showActionError(err);
+    return undefined;
+  }
+}
+
 /* ===================== BRANDED LOADER ===================== */
 function BrandedLoader({ message }: { message: string }) {
   return (
@@ -94,7 +127,20 @@ function useLoader() {
     setMessage(null);
   }, []);
 
-  return { visible, message, start, stop };
+  // Runs fn() under the loader and guarantees stop() fires even on failure
+  // (a bare start()/await/stop() left the loader on-screen forever if the
+  // awaited call threw), and surfaces any failure via withErrorAlert instead
+  // of leaving the user staring at a spinner with no explanation.
+  const run = useCallback(async <T,>(msg: string, fn: () => Promise<T>): Promise<T | undefined> => {
+    start(msg);
+    try {
+      return await withErrorAlert(fn);
+    } finally {
+      stop();
+    }
+  }, [start, stop]);
+
+  return { visible, message, start, stop, run };
 }
 
 type Tab = 'events' | 'overlays' | 'photos' | 'users' | 'leads';
@@ -203,7 +249,10 @@ function EventsTab() {
   const loader = useLoader();
 
   const loadEvents = () => {
-    api.getEvents().then((data) => { setEvents(data); setLoading(false); });
+    api.getEvents().then((data) => { setEvents(data); setLoading(false); }).catch((err) => {
+      setLoading(false);
+      showActionError(err);
+    });
   };
 
   useEffect(() => { loadEvents(); }, []);
@@ -219,16 +268,16 @@ function EventsTab() {
       Swal.fire({ icon: 'warning', title: he ? 'שדות חסרים' : 'Missing Fields', text: he ? 'נא למלא שם אירוע ותאריך' : 'Please fill in event name and date', background: '#0a0a0a', color: '#fff', confirmButtonColor: '#D4AF37' });
       return;
     }
-    loader.start(editingId ? (he ? 'שומר שינויים...' : 'Saving changes...') : (he ? 'יוצר אירוע...' : 'Creating event...'));
-    if (editingId) {
-      await api.updateEvent(editingId, { name, date, maxPrintsPerDevice: maxPrints });
-    } else {
-      await api.createEvent({ name, date, maxPrintsPerDevice: maxPrints });
-    }
-    loader.stop();
-    resetForm();
-    loadEvents();
-    Swal.fire({ icon: 'success', title: he ? '✅ נשמר בהצלחה!' : '✅ Saved!', text: editingId ? (he ? 'האירוע עודכן' : 'Event updated') : (he ? `האירוע "${name}" נוצר` : `Event "${name}" created`), timer: 2000, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
+    await loader.run(editingId ? (he ? 'שומר שינויים...' : 'Saving changes...') : (he ? 'יוצר אירוע...' : 'Creating event...'), async () => {
+      if (editingId) {
+        await api.updateEvent(editingId, { name, date, maxPrintsPerDevice: maxPrints });
+      } else {
+        await api.createEvent({ name, date, maxPrintsPerDevice: maxPrints });
+      }
+      resetForm();
+      loadEvents();
+      Swal.fire({ icon: 'success', title: he ? '✅ נשמר בהצלחה!' : '✅ Saved!', text: editingId ? (he ? 'האירוע עודכן' : 'Event updated') : (he ? `האירוע "${name}" נוצר` : `Event "${name}" created`), timer: 2000, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
+    });
   };
 
   const startEdit = (id: string) => {
@@ -242,19 +291,19 @@ function EventsTab() {
     const ev = events.find(e => e.id === id);
     const result = await Swal.fire({ icon: 'warning', title: he ? 'למחוק אירוע?' : 'Delete event?', text: he ? `"${ev?.name}" וכל התמונות שלו יימחקו לצמיתות` : `"${ev?.name}" and all its photos will be permanently deleted`, showCancelButton: true, confirmButtonColor: '#D4AF37', cancelButtonColor: '#333', confirmButtonText: he ? 'מחק' : 'Delete', cancelButtonText: he ? 'ביטול' : 'Cancel', background: '#0a0a0a', color: '#fff' });
     if (!result.isConfirmed) return;
-    loader.start(he ? 'מוחק אירוע...' : 'Deleting event...');
-    await api.deleteEvent(id);
-    loader.stop();
-    loadEvents();
-    Swal.fire({ icon: 'success', title: he ? '🗑️ נמחק!' : '🗑️ Deleted!', timer: 1500, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
+    await loader.run(he ? 'מוחק אירוע...' : 'Deleting event...', async () => {
+      await api.deleteEvent(id);
+      loadEvents();
+      Swal.fire({ icon: 'success', title: he ? '🗑️ נמחק!' : '🗑️ Deleted!', timer: 1500, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
+    });
   };
 
   const handleToggle = async (id: string, active: boolean) => {
-    loader.start(active ? (he ? 'מכבה אירוע...' : 'Deactivating...') : (he ? 'מפעיל אירוע...' : 'Activating...'));
-    await api.updateEvent(id, { active: !active });
-    loader.stop();
-    loadEvents();
-    Swal.fire({ icon: 'success', title: !active ? (he ? '✅ האירוע הופעל' : '✅ Event activated') : (he ? '⏸ האירוע כובה' : '⏸ Event deactivated'), timer: 1500, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
+    await loader.run(active ? (he ? 'מכבה אירוע...' : 'Deactivating...') : (he ? 'מפעיל אירוע...' : 'Activating...'), async () => {
+      await api.updateEvent(id, { active: !active });
+      loadEvents();
+      Swal.fire({ icon: 'success', title: !active ? (he ? '✅ האירוע הופעל' : '✅ Event activated') : (he ? '⏸ האירוע כובה' : '⏸ Event deactivated'), timer: 1500, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
+    });
   };
 
   if (loading) return <div className="flex justify-center py-12"><div className="w-8 h-8 rounded-full border-2 border-transparent animate-spin" style={{ borderTopColor: '#D4AF37', borderRightColor: '#D4AF37' }} /></div>;
@@ -391,6 +440,9 @@ function OverlaysTab() {
       setOverlays(ovs);
       setEvents(evs);
       setLoading(false);
+    }).catch((err) => {
+      setLoading(false);
+      showActionError(err);
     });
   };
 
@@ -402,7 +454,6 @@ function OverlaysTab() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     setUploading(true);
-    loader.start(he ? `מעלה ${files.length} מסגרות...` : `Uploading ${files.length} frame${files.length > 1 ? 's' : ''}...`);
 
     // Resize PNG to max 1080x1920 before upload (Vercel 4.5MB limit)
     const resizeFile = (file: File): Promise<File> => new Promise((resolve) => {
@@ -425,24 +476,25 @@ function OverlaysTab() {
       img.src = url;
     });
 
-    let uploaded = 0;
-    for (let i = 0; i < files.length; i++) {
-      const file = await resizeFile(files[i]);
-      const name = files[i].name.replace(/\.[^.]+$/, '');
-      await api.uploadOverlay(file, name, undefined); // global — no event
-      uploaded++;
-    }
-    loader.stop();
-    setUploading(false);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-    loadData();
-    Swal.fire({
-      icon: 'success',
-      title: he ? '✅ הועלה בהצלחה!' : '✅ Uploaded!',
-      text: he ? `${uploaded} מסגרות נוספו למערכת` : `${uploaded} frame${uploaded > 1 ? 's' : ''} added successfully`,
-      timer: 2500, showConfirmButton: false,
-      background: '#0a0a0a', color: '#fff',
+    await loader.run(he ? `מעלה ${files.length} מסגרות...` : `Uploading ${files.length} frame${files.length > 1 ? 's' : ''}...`, async () => {
+      let uploaded = 0;
+      for (let i = 0; i < files.length; i++) {
+        const file = await resizeFile(files[i]);
+        const name = files[i].name.replace(/\.[^.]+$/, '');
+        await api.uploadOverlay(file, name, undefined); // global — no event
+        uploaded++;
+      }
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      loadData();
+      Swal.fire({
+        icon: 'success',
+        title: he ? '✅ הועלה בהצלחה!' : '✅ Uploaded!',
+        text: he ? `${uploaded} מסגרות נוספו למערכת` : `${uploaded} frame${uploaded > 1 ? 's' : ''} added successfully`,
+        timer: 2500, showConfirmButton: false,
+        background: '#0a0a0a', color: '#fff',
+      });
     });
+    setUploading(false);
   };
 
   const handleDeleteOverlay = async (id: string) => {
@@ -455,11 +507,11 @@ function OverlaysTab() {
       background: '#0a0a0a', color: '#fff',
     });
     if (!result.isConfirmed) return;
-    loader.start(he ? 'מוחק מסגרת...' : 'Deleting frame...');
-    await api.deleteOverlay(id);
-    loader.stop();
-    loadData();
-    Swal.fire({ icon: 'success', title: he ? 'נמחק!' : 'Deleted!', timer: 1500, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
+    await loader.run(he ? 'מוחק מסגרת...' : 'Deleting frame...', async () => {
+      await api.deleteOverlay(id);
+      loadData();
+      Swal.fire({ icon: 'success', title: he ? 'נמחק!' : 'Deleted!', timer: 1500, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
+    });
   };
 
   if (loading) return <div className="flex justify-center py-12"><div className="w-8 h-8 rounded-full border-2 border-transparent animate-spin" style={{ borderTopColor: '#D4AF37', borderRightColor: '#D4AF37' }} /></div>;
@@ -525,16 +577,21 @@ function PhotosTab() {
   const [sendingToPrint, setSendingToPrint] = useState(false);
 
   const loadEvents = async () => {
-    const evs = await api.getEvents();
-    setEvents(evs);
-    // Get counts per event without loading all photo data
-    const counts: Record<string, number> = {};
-    for (const ev of evs) {
-      const photos = await api.getPhotos(ev.id);
-      counts[ev.id] = photos.length;
+    try {
+      const evs = await api.getEvents();
+      setEvents(evs);
+      // Get counts per event without loading all photo data
+      const counts: Record<string, number> = {};
+      for (const ev of evs) {
+        const photos = await api.getPhotos(ev.id);
+        counts[ev.id] = photos.length;
+      }
+      setPhotoCounts(counts);
+    } catch (err) {
+      showActionError(err);
+    } finally {
+      setLoading(false);
     }
-    setPhotoCounts(counts);
-    setLoading(false);
   };
 
   useEffect(() => { loadEvents(); }, []);
@@ -543,9 +600,14 @@ function PhotosTab() {
     setSelectedEventId(eventId);
     setLoadingPhotos(true);
     setSelectedIds(new Set());
-    const p = await api.getPhotos(eventId);
-    setPhotos(p);
-    setLoadingPhotos(false);
+    try {
+      const p = await api.getPhotos(eventId);
+      setPhotos(p);
+    } catch (err) {
+      showActionError(err);
+    } finally {
+      setLoadingPhotos(false);
+    }
   };
 
   const toggleSelect = (id: string) => {
@@ -569,44 +631,50 @@ function PhotosTab() {
     const result = await Swal.fire({ icon: 'question', title: he ? `לשלוח ${selectedIds.size} תמונות להדפסה?` : `Send ${selectedIds.size} photos to print?`, text: he ? 'התמונות יישלחו לדרופבוקס' : 'Photos will be sent to Dropbox', showCancelButton: true, confirmButtonColor: '#D4AF37', cancelButtonColor: '#333', confirmButtonText: he ? 'שלח' : 'Send', cancelButtonText: he ? 'ביטול' : 'Cancel', background: '#0a0a0a', color: '#fff' });
     if (!result.isConfirmed) return;
     setSendingToPrint(true);
-    const res = await api.sendToPrint(Array.from(selectedIds));
+    await withErrorAlert(async () => {
+      const res = await api.sendToPrint(Array.from(selectedIds));
+      if (res.sent > 0) {
+        setPhotos((prev) => prev.map((p) => selectedIds.has(p.id) ? { ...p, printStatus: 'sent' } : p));
+        setSelectedIds(new Set());
+        Swal.fire({ icon: 'success', title: he ? `${res.sent} תמונות נשלחו להדפסה!` : `${res.sent} photos sent to print!`, timer: 2000, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
+      }
+      if (res.failed > 0) {
+        Swal.fire({ icon: 'error', title: he ? `${res.failed} תמונות נכשלו` : `${res.failed} photos failed`, text: he ? 'בדוק הגדרות דרופבוקס' : 'Check Dropbox settings', background: '#0a0a0a', color: '#fff', confirmButtonColor: '#D4AF37' });
+      }
+    });
     setSendingToPrint(false);
-    if (res.sent > 0) {
-      setPhotos((prev) => prev.map((p) => selectedIds.has(p.id) ? { ...p, printStatus: 'sent' } : p));
-      setSelectedIds(new Set());
-      Swal.fire({ icon: 'success', title: he ? `${res.sent} תמונות נשלחו להדפסה!` : `${res.sent} photos sent to print!`, timer: 2000, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
-    }
-    if (res.failed > 0) {
-      Swal.fire({ icon: 'error', title: he ? `${res.failed} תמונות נכשלו` : `${res.failed} photos failed`, text: he ? 'בדוק הגדרות דרופבוקס' : 'Check Dropbox settings', background: '#0a0a0a', color: '#fff', confirmButtonColor: '#D4AF37' });
-    }
   };
 
-  const handleApprovePhoto = async (photoId: string) => {
+  const handleApprovePhoto = async (photoId: string) => withErrorAlert(async () => {
     await api.updatePhoto(photoId, { moderationStatus: 'approved' });
     setPhotos((prev) => prev.map((p) => p.id === photoId ? { ...p, moderationStatus: 'approved' } : p));
-  };
+  });
 
-  const handleRejectPhoto = async (photoId: string) => {
+  const handleRejectPhoto = async (photoId: string) => withErrorAlert(async () => {
     await api.updatePhoto(photoId, { moderationStatus: 'rejected' });
     setPhotos((prev) => prev.filter((p) => p.id !== photoId));
-  };
+  });
 
   const handleDeletePhoto = async (photoId: string) => {
     const result = await Swal.fire({ icon: 'warning', title: he ? 'למחוק תמונה?' : 'Delete photo?', showCancelButton: true, confirmButtonColor: '#D4AF37', cancelButtonColor: '#333', confirmButtonText: he ? 'מחק' : 'Delete', cancelButtonText: he ? 'ביטול' : 'Cancel', background: '#0a0a0a', color: '#fff' });
     if (!result.isConfirmed) return;
-    await api.deletePhoto(photoId);
-    setPhotos((prev) => prev.filter((p) => p.id !== photoId));
-    setPhotoCounts((prev) => ({ ...prev, [selectedEventId!]: (prev[selectedEventId!] || 1) - 1 }));
+    await withErrorAlert(async () => {
+      await api.deletePhoto(photoId);
+      setPhotos((prev) => prev.filter((p) => p.id !== photoId));
+      setPhotoCounts((prev) => ({ ...prev, [selectedEventId!]: (prev[selectedEventId!] || 1) - 1 }));
+    });
   };
 
   const handleDeleteAllPhotos = async () => {
     if (!selectedEventId) return;
     const result = await Swal.fire({ icon: 'error', title: he ? 'למחוק את כל התמונות?' : 'Delete ALL photos?', text: he ? 'פעולה זו לא ניתנת לביטול!' : 'This action cannot be undone!', showCancelButton: true, confirmButtonColor: '#D4AF37', cancelButtonColor: '#333', confirmButtonText: he ? 'מחק הכל' : 'Delete All', cancelButtonText: he ? 'ביטול' : 'Cancel', background: '#0a0a0a', color: '#fff' });
     if (!result.isConfirmed) return;
-    await api.deleteEventPhotos(selectedEventId);
-    setPhotos([]);
-    setPhotoCounts((prev) => ({ ...prev, [selectedEventId]: 0 }));
-    Swal.fire({ icon: 'success', title: he ? 'כל התמונות נמחקו' : 'All photos deleted', timer: 1500, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
+    await withErrorAlert(async () => {
+      await api.deleteEventPhotos(selectedEventId);
+      setPhotos([]);
+      setPhotoCounts((prev) => ({ ...prev, [selectedEventId]: 0 }));
+      Swal.fire({ icon: 'success', title: he ? 'כל התמונות נמחקו' : 'All photos deleted', timer: 1500, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
+    });
   };
 
   const handleDownloadAll = async () => {
@@ -804,19 +872,22 @@ function UsersTab() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.getUsers().then((data: UserData[]) => { setUsers(data); setLoading(false); }).catch(() => setLoading(false));
+    api.getUsers().then((data: UserData[]) => { setUsers(data); setLoading(false); }).catch((err) => {
+      setLoading(false);
+      showActionError(err);
+    });
   }, []);
 
-  const toggleActive = async (user: UserData) => {
+  const toggleActive = async (user: UserData) => withErrorAlert(async () => {
     await api.updateUser(user.id, { active: !user.active });
     setUsers(users.map(u => u.id === user.id ? { ...u, active: !u.active } : u));
-  };
+  });
 
-  const toggleRole = async (user: UserData) => {
+  const toggleRole = async (user: UserData) => withErrorAlert(async () => {
     const newRole = user.role === 'super_admin' ? 'account_manager' : 'super_admin';
     await api.updateUser(user.id, { role: newRole });
     setUsers(users.map(u => u.id === user.id ? { ...u, role: newRole } : u));
-  };
+  });
 
   if (loading) {
     return (
@@ -904,26 +975,37 @@ function LeadsTab() {
   };
 
   const handleWhatsApp = async (lead: LeadData) => {
+    // Opening WhatsApp is the point of the click — do it regardless of
+    // whether the "mark as handled" bookkeeping call below succeeds; that's
+    // a background side effect, not worth interrupting the user over.
     window.open(`https://wa.me/${formatWaPhone(lead.phone)}`, '_blank');
     if (!lead.handled) {
-      await api.updateLead(lead.id, { handled: true });
-      setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, handled: true } : l));
+      try {
+        await api.updateLead(lead.id, { handled: true });
+        setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, handled: true } : l));
+      } catch (err) {
+        console.error('Failed to mark lead as handled:', err);
+      }
     }
   };
 
   const handleCall = async (lead: LeadData) => {
     window.location.href = `tel:${lead.phone}`;
     if (!lead.handled) {
-      await api.updateLead(lead.id, { handled: true });
-      setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, handled: true } : l));
+      try {
+        await api.updateLead(lead.id, { handled: true });
+        setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, handled: true } : l));
+      } catch (err) {
+        console.error('Failed to mark lead as handled:', err);
+      }
     }
   };
 
-  const toggleHandled = async (lead: LeadData) => {
+  const toggleHandled = async (lead: LeadData) => withErrorAlert(async () => {
     const next = !lead.handled;
     await api.updateLead(lead.id, { handled: next });
     setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, handled: next } : l));
-  };
+  });
 
   const handleDeleteLead = async (lead: LeadData) => {
     const result = await Swal.fire({
@@ -942,16 +1024,18 @@ function LeadsTab() {
     });
     if (!result.isConfirmed) return;
 
-    await api.deleteLead(lead.id);
-    setLeads(prev => prev.filter(l => l.id !== lead.id));
-    Swal.fire({
-      icon: 'success',
-      title: he ? 'נמחק!' : 'Deleted!',
-      text: he ? 'המשתמש יוכל להשאיר פרטים שוב' : 'The user can now submit details again',
-      timer: 2000,
-      showConfirmButton: false,
-      background: '#0a0a0a',
-      color: '#fff',
+    await withErrorAlert(async () => {
+      await api.deleteLead(lead.id);
+      setLeads(prev => prev.filter(l => l.id !== lead.id));
+      Swal.fire({
+        icon: 'success',
+        title: he ? 'נמחק!' : 'Deleted!',
+        text: he ? 'המשתמש יוכל להשאיר פרטים שוב' : 'The user can now submit details again',
+        timer: 2000,
+        showConfirmButton: false,
+        background: '#0a0a0a',
+        color: '#fff',
+      });
     });
   };
 
