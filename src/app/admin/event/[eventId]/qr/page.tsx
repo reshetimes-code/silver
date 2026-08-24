@@ -25,6 +25,9 @@ export default function QRDisplayPage() {
     api.getEvent(eventId).then((data) => {
       setEvent(data);
       setLoading(false);
+    }).catch(() => {
+      setEvent(null);
+      setLoading(false);
     });
   }, [eventId]);
 
@@ -63,10 +66,18 @@ export default function QRDisplayPage() {
 
   if (!event) {
     return (
-      <div className="min-h-dvh flex items-center justify-center">
-        <div className="glass-card p-8 text-center">
-          <span className="text-5xl block mb-3">😕</span>
-          <h2 className="text-xl font-bold text-white">Event not found</h2>
+      <div className="min-h-dvh flex items-center justify-center px-5">
+        <div className="glass-card p-8 text-center max-w-sm">
+          <span className="text-5xl block mb-4">😕</span>
+          <h2 className="text-xl font-bold text-white mb-3">
+            {he ? 'האירוע הזה כבר לא קיים' : 'This event no longer exists'}
+          </h2>
+          <p className="text-sm text-white/50 mb-5">
+            {he ? 'ייתכן שהאירוע נמחק. חזור לרשימת האירועים ונסה שוב.' : 'The event may have been deleted. Go back to the events list and try again.'}
+          </p>
+          <a href="/admin" className="btn-secondary w-full inline-block">
+            {he ? 'חזרה לפאנל הניהול' : 'Back to admin panel'}
+          </a>
         </div>
       </div>
     );

@@ -6,6 +6,7 @@ import { useStore } from '@/lib/store';
 import { t } from '@/lib/i18n';
 import { useHydrated } from '@/lib/use-hydrated';
 import { api } from '@/lib/api';
+import { showActionError } from '@/lib/errors';
 import Logo from '@/components/ui/Logo';
 import ParticleBackground from '@/components/ui/ParticleBackground';
 import Link from 'next/link';
@@ -39,9 +40,16 @@ export default function DashboardPage() {
         return;
       }
       setUser(u);
+      // Logged in fine at this point — a failure here is just "couldn't load
+      // events", not an auth problem, so show it and stay on the dashboard
+      // (with an empty list) instead of bouncing back to login or hanging
+      // on the spinner forever.
       api.getEvents().then((evs: EventData[]) => {
         setEvents(evs.filter((e) => e.active));
         setLoading(false);
+      }).catch((err) => {
+        setLoading(false);
+        showActionError(err);
       });
     }).catch(() => router.push('/login'));
   }, [router]);

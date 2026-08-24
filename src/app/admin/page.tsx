@@ -12,39 +12,7 @@ import Logo from '@/components/ui/Logo';
 import AdminAuth from '@/components/ui/AdminAuth';
 import ParticleBackground from '@/components/ui/ParticleBackground';
 import Link from 'next/link';
-
-/**
- * Every admin action (save/delete/upload/etc.) used to just `await` the API
- * call with no try/catch. If it failed — network drop, server error, a
- * validation error the API rejected — the user got nothing: no message, and
- * for loader-wrapped actions the full-screen spinner never went away, so
- * they were stuck with no way to know what happened or what to do next.
- * Wrap any admin action in this so a failure always surfaces a clear,
- * actionable message instead of a silent hang.
- */
-async function showActionError(err: unknown) {
-  console.error(err);
-  const locale = useStore.getState().locale;
-  const he = locale === 'he';
-  const detail = err instanceof Error && err.message ? err.message : '';
-  await Swal.fire({
-    icon: 'error',
-    title: he ? 'הפעולה נכשלה' : 'Action failed',
-    text: he
-      ? `${detail ? detail + '. ' : ''}בדוק את החיבור לאינטרנט ונסה שוב. אם זה ממשיך לקרות, פנה לתמיכה.`
-      : `${detail ? detail + '. ' : ''}Check your internet connection and try again. If this keeps happening, contact support.`,
-    background: '#0a0a0a', color: '#fff', confirmButtonColor: '#D4AF37',
-  });
-}
-
-async function withErrorAlert<T>(fn: () => Promise<T>): Promise<T | undefined> {
-  try {
-    return await fn();
-  } catch (err) {
-    await showActionError(err);
-    return undefined;
-  }
-}
+import { showActionError, withErrorAlert } from '@/lib/errors';
 
 /* ===================== BRANDED LOADER ===================== */
 function BrandedLoader({ message }: { message: string }) {

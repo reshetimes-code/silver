@@ -86,6 +86,12 @@ export default function PreviewPage() {
       setEvent(ev);
       setOverlays(ovs);
       setLoading(false);
+    }).catch(() => {
+      // Leave event null — the redirect effect below sends the guest back
+      // to the capture page instead of leaving them stuck on this spinner
+      // with their photo trapped in sessionStorage.
+      setEvent(null);
+      setLoading(false);
     });
   }, [eventId]);
 
