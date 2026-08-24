@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { useHydrated } from '@/lib/use-hydrated';
 import { api } from '@/lib/api';
+import Swal from '@/lib/swal';
 import Logo from '@/components/ui/Logo';
 import ParticleBackground from '@/components/ui/ParticleBackground';
 import Link from 'next/link';
@@ -25,11 +26,26 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // A small red line under the form is easy to miss — every auth failure
+  // (Google redirect included) shows as a clear SweetAlert popup too, not
+  // just inline text, so the user can't scroll past it unnoticed.
+  const showError = (message: string) => {
+    setError(message);
+    Swal.fire({
+      icon: 'error',
+      title: he ? 'ההתחברות נכשלה' : 'Sign-in failed',
+      text: message,
+      confirmButtonColor: '#D4AF37',
+      background: '#0a0a0a',
+      color: '#fff',
+    });
+  };
+
   // Check for google_failed error from redirect callback
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('error') === 'google_failed' || params.get('error') === 'invalid_token') {
-      setError(he ? 'כניסה עם Google נכשלה' : 'Google sign-in failed');
+      showError(he ? 'כניסה עם Google נכשלה. נסה שוב, או התחבר עם אימייל וסיסמה.' : 'Google sign-in failed. Try again, or log in with email and password.');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -67,26 +83,26 @@ export default function LoginPage() {
 
   const handleLogin = async () => {
     setError('');
-    if (!email || !password) { setError(he ? 'נא למלא את כל השדות' : 'Please fill in all fields'); return; }
+    if (!email || !password) { showError(he ? 'נא למלא את כל השדות' : 'Please fill in all fields'); return; }
     try {
       setLoading(true);
       await api.login(email.trim(), password);
       router.push('/dashboard');
     } catch (err: unknown) {
-      setError(describeAuthError(err instanceof Error ? err.message : ''));
+      showError(describeAuthError(err instanceof Error ? err.message : ''));
     } finally { setLoading(false); }
   };
 
   const handleRegister = async () => {
     setError('');
-    if (!email || !password || !name) { setError(he ? 'נא למלא את כל השדות' : 'Please fill in all required fields'); return; }
-    if (password.length < 6) { setError(he ? 'סיסמה חייבת להיות לפחות 6 תווים' : 'Password must be at least 6 characters'); return; }
+    if (!email || !password || !name) { showError(he ? 'נא למלא את כל השדות' : 'Please fill in all required fields'); return; }
+    if (password.length < 6) { showError(he ? 'סיסמה חייבת להיות לפחות 6 תווים' : 'Password must be at least 6 characters'); return; }
     try {
       setLoading(true);
       await api.register({ email: email.trim(), password, name: name.trim(), phone: phone.trim() });
       router.push('/dashboard');
     } catch (err: unknown) {
-      setError(describeAuthError(err instanceof Error ? err.message : ''));
+      showError(describeAuthError(err instanceof Error ? err.message : ''));
     } finally { setLoading(false); }
   };
 
