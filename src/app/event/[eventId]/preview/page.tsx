@@ -28,7 +28,9 @@ async function buildComposite(
   adjust: { pos: { x: number; y: number }; scale: number; size: { w: number; h: number } }
 ): Promise<string> {
   const [photo, overlay] = await Promise.all([loadImg(photoUrl), loadImg(overlayUrl)]);
-  const W = 1080, H = 1920;
+  // Print-lab size (~4x6" @ ~310 DPI), matching the capture pipeline in
+  // event/[eventId]/page.tsx — must stay in sync with PHOTO_WIDTH/HEIGHT there.
+  const W = 1240, H = 1844;
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
@@ -67,7 +69,7 @@ export default function PreviewPage() {
   const [event, setEvent] = useState<EventData | null>(null);
   const [overlays, setOverlays] = useState<OverlayData[]>([]);
   const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null);
-  const [photoAdjust, setPhotoAdjust] = useState({ pos: { x: 0, y: 0 }, scale: 1.0, size: { w: 320, h: 568 } });
+  const [photoAdjust, setPhotoAdjust] = useState({ pos: { x: 0, y: 0 }, scale: 1.0, size: { w: 320, h: 476 } });
   const [printing, setPrinting] = useState(false);
   const [printSuccess, setPrintSuccess] = useState(false);
   const [submittedPhotoId, setSubmittedPhotoId] = useState<string | null>(null);
@@ -115,15 +117,20 @@ export default function PreviewPage() {
     try {
       let finalImage = image;
       let finalOverlayId = selectedOverlayId;
+      let rawImage: string | undefined;
       if (selectedOverlayId !== 'none' && selectedOverlay) {
         finalImage = await buildComposite(image, selectedOverlay.url, photoAdjust);
         finalOverlayId = 'none';
+        // Keep the pre-frame version too — saved to a separate "Source
+        // Photos" folder in Dropbox so frames can be applied manually later.
+        rawImage = image;
       }
 
       const result = await api.submitPhoto({
         eventId,
         overlayId: finalOverlayId,
         image: finalImage,
+        rawImage,
         deviceId,
         phoneNumber: guestPhone,
       });
@@ -303,7 +310,7 @@ export default function PreviewPage() {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: i * 0.05 }}
                 className="glass-card overflow-hidden active:scale-95 transition-transform"
-                onClick={() => { setSelectedOverlayId(overlay.id); setPhotoAdjust({ pos: { x: 0, y: 0 }, scale: 1.0, size: { w: 320, h: 568 } }); }}
+                onClick={() => { setSelectedOverlayId(overlay.id); setPhotoAdjust({ pos: { x: 0, y: 0 }, scale: 1.0, size: { w: 320, h: 476 } }); }}
               >
                 <div className="relative overflow-hidden bg-black">
                   <img src={overlay.url} alt={overlay.name} className="relative w-full h-auto block z-10 pointer-events-none" />
@@ -312,21 +319,13 @@ export default function PreviewPage() {
                 <div className="p-2 text-center"><p className="text-xs font-bold text-white/70 truncate">{overlay.name}</p></div>
               </motion.button>
             ))}
-            <motion.button
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: overlays.length * 0.05 }}
-              className="glass-card overflow-hidden active:scale-95 transition-transform"
-              onClick={() => setSelectedOverlayId('none')}
-            >
-              <div className="aspect-[3/4] relative"><img src={image} alt="" className="w-full h-full object-cover" /></div>
-              <div className="p-2 text-center"><p className="text-xs font-bold text-white/70">{he ? 'ללא מסגרת' : 'No Frame'}</p></div>
-            </motion.button>
           </div>
 
+          {/* Guests always print with a frame — this only shows up if the
+              event genuinely has none configured, so no one gets stuck. */}
           {overlays.length === 0 && (
             <div className="text-center mt-8">
-              <p className="text-white/40 text-sm">{he ? 'אין מסגרות זמינות' : 'No overlays available'}</p>
+              <p className="text-white/40 text-sm">{he ? 'אין עדיין מסגרות לאירוע הזה' : 'No frames set up for this event yet'}</p>
               <button className="btn-glow mt-4" onClick={() => setSelectedOverlayId('none')}>
                 {he ? 'המשך בלי מסגרת' : 'Continue without frame'}
               </button>

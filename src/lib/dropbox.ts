@@ -120,8 +120,8 @@ async function compositePhotoWithOverlay(photoBase64: string, overlayBase64: str
   const overlayBuffer = Buffer.from(overlayData, 'base64');
 
   const overlayMeta = await sharp(overlayBuffer).metadata();
-  const overlayW = overlayMeta.width || 1080;
-  const overlayH = overlayMeta.height || 1440;
+  const overlayW = overlayMeta.width || 1240;
+  const overlayH = overlayMeta.height || 1844;
 
   // Detect transparent window in the overlay
   const transparentArea = await detectTransparentArea(overlayBuffer);
@@ -213,6 +213,33 @@ export async function uploadToDropbox(photoId: string): Promise<{ success: boole
     if (!uploadRes.ok) {
       const err = await uploadRes.text();
       throw new Error(err);
+    }
+
+    // Also save the pre-frame original into a "Source Photos" subfolder, so
+    // frames can be applied manually later (e.g. in desktop software) — only
+    // present when a frame was actually baked into the main upload above.
+    // Best-effort: a failure here shouldn't fail the whole upload, since the
+    // framed photo (what guests actually see/print) already succeeded.
+    if (photo.sourcePhotoUrl) {
+      try {
+        const sourceData = photo.sourcePhotoUrl.replace(/^data:image\/\w+;base64,/, '');
+        const sourceBuffer = Buffer.from(sourceData, 'base64');
+        const sourcePath = `${eventFolder}/Source Photos/${fileName}`;
+        const sourceRes = await fetch('https://content.dropboxapi.com/2/files/upload', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Dropbox-API-Arg': asciiSafeJson({ path: sourcePath, mode: 'add', autorename: true, mute: false }),
+            'Content-Type': 'application/octet-stream',
+          },
+          body: new Uint8Array(sourceBuffer),
+        });
+        if (!sourceRes.ok) {
+          console.error(`Source photo upload failed for ${photoId}:`, await sourceRes.text());
+        }
+      } catch (sourceErr) {
+        console.error(`Source photo upload failed for ${photoId}:`, sourceErr);
+      }
     }
 
     await prisma.photo.update({

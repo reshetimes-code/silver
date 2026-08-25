@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
       eventId: body.eventId,
       overlayId: body.overlayId === 'none' ? null : body.overlayId,
       photoUrl: body.image,
+      sourcePhotoUrl: body.rawImage || null,
       deviceId: body.deviceId,
       phoneNumber: body.phoneNumber || '',
       status: 'pending',

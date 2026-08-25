@@ -423,9 +423,10 @@ function OverlaysTab() {
     if (!files || files.length === 0) return;
     setUploading(true);
 
-    // Resize PNG to max 1080x1920 before upload (Vercel 4.5MB limit)
+    // Resize PNG before upload (size limit) — capped to the print canvas size
+    // so frames aren't upscaled/blurred when composited at full resolution.
     const resizeFile = (file: File): Promise<File> => new Promise((resolve) => {
-      const MAX_W = 1080, MAX_H = 1920;
+      const MAX_W = 1240, MAX_H = 1844;
       const img = new Image();
       const url = URL.createObjectURL(file);
       img.onload = () => {
@@ -449,7 +450,8 @@ function OverlaysTab() {
       for (let i = 0; i < files.length; i++) {
         const file = await resizeFile(files[i]);
         const name = files[i].name.replace(/\.[^.]+$/, '');
-        await api.uploadOverlay(file, name, undefined); // global — no event
+        // uploadEventId === '' means "global" (usable by every event's guests)
+        await api.uploadOverlay(file, name, uploadEventId || undefined);
         uploaded++;
       }
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -463,6 +465,13 @@ function OverlaysTab() {
       });
     });
     setUploading(false);
+  };
+
+  const handleReassignOverlay = async (overlayId: string, newEventId: string) => {
+    await withErrorAlert(async () => {
+      await api.updateOverlay(overlayId, { eventId: newEventId || null });
+      setOverlays((prev) => prev.map((o) => o.id === overlayId ? { ...o, eventId: newEventId || null } : o));
+    });
   };
 
   const handleDeleteOverlay = async (id: string) => {
@@ -484,11 +493,34 @@ function OverlaysTab() {
 
   if (loading) return <div className="flex justify-center py-12"><div className="w-8 h-8 rounded-full border-2 border-transparent animate-spin" style={{ borderTopColor: '#D4AF37', borderRightColor: '#D4AF37' }} /></div>;
 
+  const visibleOverlays = selectedEventId === ''
+    ? overlays
+    : selectedEventId === '__global__'
+      ? overlays.filter((o) => !o.eventId)
+      : overlays.filter((o) => o.eventId === selectedEventId);
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       {loader.visible && loader.message && <BrandedLoader message={loader.message} />}
 
-      {/* Upload button — global, no event selection */}
+      {/* Upload — pick which event this frame belongs to, or leave as global
+          (available to every event's guests) */}
+      <div className="glass-card p-3 mb-3">
+        <label className="text-[10px] uppercase tracking-wider text-white/40 mb-1.5 block">
+          {he ? 'שייך לאירוע' : 'Assign to event'}
+        </label>
+        <select
+          value={uploadEventId}
+          onChange={(e) => setUploadEventId(e.target.value)}
+          className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-[#D4AF37]"
+        >
+          <option value="" className="bg-[#111]">{he ? '🌐 גלובלי — זמין לכל האירועים' : '🌐 Global — available to every event'}</option>
+          {events.map((ev) => (
+            <option key={ev.id} value={ev.id} className="bg-[#111]">{ev.name}</option>
+          ))}
+        </select>
+      </div>
+
       <input ref={fileInputRef} type="file" accept="image/png" multiple className="hidden" onChange={handleUpload} />
       <button
         className="btn-glow w-full mb-5"
@@ -498,8 +530,23 @@ function OverlaysTab() {
         {uploading ? '⏳' : '+'} {he ? 'העלה מסגרות PNG' : 'Upload PNG Frames'}
       </button>
 
+      {/* Filter the list below by event */}
+      {overlays.length > 0 && (
+        <select
+          value={selectedEventId}
+          onChange={(e) => setSelectedEventId(e.target.value)}
+          className="w-full px-3 py-2 mb-4 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-[#D4AF37]"
+        >
+          <option value="" className="bg-[#111]">{he ? 'כל המסגרות' : 'All frames'}</option>
+          <option value="__global__" className="bg-[#111]">{he ? 'גלובליות בלבד' : 'Global only'}</option>
+          {events.map((ev) => (
+            <option key={ev.id} value={ev.id} className="bg-[#111]">{ev.name}</option>
+          ))}
+        </select>
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {overlays.map((overlay, i) => (
+        {visibleOverlays.map((overlay, i) => (
           <motion.div key={overlay.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.04 }}
             className="glass-card overflow-hidden relative">
             <div className="aspect-[3/4] relative">
@@ -511,7 +558,17 @@ function OverlaysTab() {
             </div>
             <div className="p-2">
               <p className="text-xs font-bold text-white/70 truncate">{overlay.name}</p>
-              <div className="flex justify-end mt-1">
+              <select
+                value={overlay.eventId || ''}
+                onChange={(e) => handleReassignOverlay(overlay.id, e.target.value)}
+                className="w-full mt-1.5 px-1.5 py-1 rounded-lg bg-white/5 border border-white/10 text-white/60 text-[10px] focus:outline-none focus:border-[#D4AF37]"
+              >
+                <option value="" className="bg-[#111]">{he ? '🌐 גלובלי' : '🌐 Global'}</option>
+                {events.map((ev) => (
+                  <option key={ev.id} value={ev.id} className="bg-[#111]">{ev.name}</option>
+                ))}
+              </select>
+              <div className="flex justify-end mt-1.5">
                 <button className="w-6 h-6 rounded-full bg-red-500/15 text-red-400 flex items-center justify-center text-xs active:bg-red-500/30"
                   onClick={() => handleDeleteOverlay(overlay.id)}>✕</button>
               </div>
@@ -525,6 +582,13 @@ function OverlaysTab() {
           <span className="text-5xl block mb-3">🖼️</span>
           <h3 className="text-lg font-bold text-white mb-1">{he ? 'אין מסגרות עדיין' : 'No frames yet'}</h3>
           <p className="text-sm text-white/40">{he ? 'העלה קבצי PNG' : 'Upload PNG files'}</p>
+        </div>
+      )}
+
+      {overlays.length > 0 && visibleOverlays.length === 0 && (
+        <div className="glass-card p-10 text-center">
+          <span className="text-5xl block mb-3">🔍</span>
+          <p className="text-sm text-white/40">{he ? 'אין מסגרות בסינון הזה' : 'No frames match this filter'}</p>
         </div>
       )}
     </motion.div>

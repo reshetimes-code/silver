@@ -26,8 +26,13 @@ interface EventData {
 const TIMER_OPTIONS = [0, 3, 5, 10] as const;
 type TimerValue = typeof TIMER_OPTIONS[number];
 
-const PHOTO_WIDTH = 1080;
-const PHOTO_HEIGHT = 1920;
+// Print-lab size (~4x6" @ ~310 DPI) rather than a phone-screen 9:16 ratio —
+// the physical printer expects this exact aspect ratio, so the whole
+// capture pipeline (viewfinder crop, composite canvas) targets it directly
+// instead of shooting 9:16 and cropping down later, which would cut off
+// part of the frame/photo to fit.
+const PHOTO_WIDTH = 1240;
+const PHOTO_HEIGHT = 1844;
 
 export default function CapturePhotoPage() {
   const params = useParams();
@@ -460,7 +465,7 @@ export default function CapturePhotoPage() {
       const drawW = srcW * finalScale;
       const drawH = srcH * finalScale;
       const drawX = (PHOTO_WIDTH - drawW) / 2 + cropPos.x * (PHOTO_WIDTH / 400);
-      const drawY = (PHOTO_HEIGHT - drawH) / 2 + cropPos.y * (PHOTO_HEIGHT / 700);
+      const drawY = (PHOTO_HEIGHT - drawH) / 2 + cropPos.y * (PHOTO_HEIGHT / 595);
 
       // Draw photo into a temp canvas, apply 5% alpha fade to all 4 edges
       const photoCanvas = document.createElement('canvas');
@@ -497,11 +502,13 @@ export default function CapturePhotoPage() {
         sessionStorage.setItem('photobooth-captured-image', result);
         router.push(`/event/${eventId}/preview`);
       } catch {
-        // If too large, compress
+        // If too large, compress — keep the same aspect ratio as the full
+        // canvas (PHOTO_WIDTH x PHOTO_HEIGHT) so this fallback doesn't
+        // squish the image.
         const smallCanvas = document.createElement('canvas');
         smallCanvas.width = 720;
-        smallCanvas.height = 1280;
-        smallCanvas.getContext('2d')!.drawImage(canvas, 0, 0, 720, 1280);
+        smallCanvas.height = Math.round(720 * (PHOTO_HEIGHT / PHOTO_WIDTH));
+        smallCanvas.getContext('2d')!.drawImage(canvas, 0, 0, smallCanvas.width, smallCanvas.height);
         sessionStorage.setItem('photobooth-captured-image', smallCanvas.toDataURL('image/jpeg', 0.85));
         router.push(`/event/${eventId}/preview`);
       }
@@ -861,7 +868,7 @@ export default function CapturePhotoPage() {
         </div>
       )}
 
-      {/* ===== CROP SCREEN — adjust photo in 9:16 frame ===== */}
+      {/* ===== CROP SCREEN — adjust photo in the print-lab frame ===== */}
       {mode === 'crop' && rawImage && (
         <div className="fixed inset-0 z-[999] bg-black flex flex-col" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
           {/* Header */}
@@ -870,12 +877,12 @@ export default function CapturePhotoPage() {
             <p className="text-[10px] text-white/40">{he ? 'גרור להזיז • צבוט לזום' : 'Drag to move • Pinch to zoom'}</p>
           </div>
 
-          {/* Crop area — 9:16 frame */}
+          {/* Crop area — matches the print aspect ratio (PHOTO_WIDTH x PHOTO_HEIGHT) */}
           <div className="flex-1 flex items-center justify-center px-6 overflow-hidden">
             <div
               ref={cropAreaRef}
               className="relative w-full overflow-hidden rounded-2xl border border-white/20"
-              style={{ aspectRatio: '9/16', maxHeight: '70vh', touchAction: 'none' }}
+              style={{ aspectRatio: `${PHOTO_WIDTH}/${PHOTO_HEIGHT}`, maxHeight: '70vh', touchAction: 'none' }}
             >
               {/* Blurred background fill */}
               <img

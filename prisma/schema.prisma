@@ -60,6 +60,10 @@ model Photo {
   eventId          String
   overlayId        String?
   photoUrl         String   @db.Text
+  // The photo before the frame was baked in — only set when a frame was
+  // actually applied. Uploaded to a "Source Photos" subfolder in Dropbox
+  // so the un-framed original is available too.
+  sourcePhotoUrl   String?  @db.Text
   deviceId         String
   phoneNumber      String   @default("")
   status           String   @default("pending")

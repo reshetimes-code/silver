@@ -160,13 +160,21 @@ export const api = {
     const res = await fetch(`${BASE}/api/overlays/${id}`, { method: 'DELETE' });
     return handleJson(res, 'Failed to delete frame');
   },
+  async updateOverlay(id: string, data: { name?: string; eventId?: string | null }) {
+    const res = await fetch(`${BASE}/api/overlays/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return handleJson(res, 'Failed to update frame');
+  },
 
   // ===== Photos =====
   async getPhotos(eventId?: string) {
     const res = await fetch(`${BASE}/api/photos?eventId=${eventId || 'all'}`);
     return handleJson(res, 'Failed to load photos');
   },
-  async submitPhoto(data: { eventId: string; overlayId: string; image: string; deviceId: string; phoneNumber: string }) {
+  async submitPhoto(data: { eventId: string; overlayId: string; image: string; rawImage?: string; deviceId: string; phoneNumber: string }) {
     const res = await fetch(`${BASE}/api/photos`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
