@@ -15,7 +15,12 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
       ...(selectFields ? { select: selectFields } : {}),
     });
-    return NextResponse.json(overlays);
+    // Frames made specifically for this event should be the first thing a
+    // guest sees, not buried after generic/global ones — sort them ahead,
+    // each group keeping its own newest-first order.
+    const specific = overlays.filter((o) => o.eventId === eventId);
+    const global = overlays.filter((o) => o.eventId === null);
+    return NextResponse.json([...specific, ...global]);
   }
 
   const overlays = await prisma.overlay.findMany({
