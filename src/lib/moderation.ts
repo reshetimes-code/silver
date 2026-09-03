@@ -14,7 +14,7 @@ export async function moderateImage(base64Image: string): Promise<ModerationResu
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
 
     const imageData = base64Image.replace(/^data:image\/\w+;base64,/, '');
 
@@ -72,7 +72,14 @@ Rules:
 
     return { status: 'approved' };
   } catch (error) {
-    console.error('Moderation error:', error);
-    return { status: 'approved' };
+    // Fail SAFE, not open: if the moderation call itself breaks (bad/expired
+    // API key, a model getting deprecated, a network blip), this used to
+    // silently return 'approved' — meaning every photo sailed through with
+    // zero moderation and no one would ever know. Queue it for manual
+    // review instead: the guest's photo still goes through fine, but an
+    // actual person checks it rather than the system pretending it was
+    // vetted when it wasn't.
+    console.error('Moderation error — flagging for manual review instead of silently approving:', error);
+    return { status: 'pending_review', reason: 'moderation_unavailable' };
   }
 }
