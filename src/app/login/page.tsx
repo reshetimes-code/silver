@@ -50,12 +50,14 @@ export default function LoginPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // If already logged in, redirect to dashboard
+  // If already logged in, go straight to the right home screen for this
+  // account: super admins manage every event, so they land in the admin
+  // panel; everyone else lands on their own "my events" dashboard.
   useEffect(() => {
     const token = api.getStoredToken();
     if (token) {
       api.getMe().then((u) => {
-        if (u) router.push('/dashboard');
+        if (u) router.push(u.role === 'super_admin' ? '/admin' : '/dashboard');
       });
     }
   }, [router]);
@@ -86,8 +88,8 @@ export default function LoginPage() {
     if (!email || !password) { showError(he ? 'נא למלא את כל השדות' : 'Please fill in all fields'); return; }
     try {
       setLoading(true);
-      await api.login(email.trim(), password);
-      router.push('/dashboard');
+      const { user } = await api.login(email.trim(), password);
+      router.push(user.role === 'super_admin' ? '/admin' : '/dashboard');
     } catch (err: unknown) {
       showError(describeAuthError(err instanceof Error ? err.message : ''));
     } finally { setLoading(false); }
@@ -99,8 +101,8 @@ export default function LoginPage() {
     if (password.length < 6) { showError(he ? 'סיסמה חייבת להיות לפחות 6 תווים' : 'Password must be at least 6 characters'); return; }
     try {
       setLoading(true);
-      await api.register({ email: email.trim(), password, name: name.trim(), phone: phone.trim() });
-      router.push('/dashboard');
+      const { user } = await api.register({ email: email.trim(), password, name: name.trim(), phone: phone.trim() });
+      router.push(user.role === 'super_admin' ? '/admin' : '/dashboard');
     } catch (err: unknown) {
       showError(describeAuthError(err instanceof Error ? err.message : ''));
     } finally { setLoading(false); }
