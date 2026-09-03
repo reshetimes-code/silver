@@ -78,7 +78,14 @@ export default function DashboardPage() {
 
       {/* Header with hamburger */}
       <div className="app-header flex items-center justify-between relative z-20">
-        <Link href="/"><Logo size="md" animate={false} /></Link>
+        {/* Logo only navigates for super admins (back to the admin panel) —
+            for everyone else (account managers, and any guest elsewhere in
+            the app) it's just a mark, not a button. */}
+        {user?.role === 'super_admin' ? (
+          <Link href="/admin"><Logo size="md" animate={false} /></Link>
+        ) : (
+          <Logo size="md" animate={false} />
+        )}
         <button
           onClick={() => setMenuOpen(!menuOpen)}
           className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center justify-center gap-1.5 active:scale-90 transition-transform"

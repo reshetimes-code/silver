@@ -159,9 +159,15 @@ export default function AdminPage() {
     <div className="min-h-dvh relative" dir={isRtl ? 'rtl' : 'ltr'}>
       <ParticleBackground />
       <LanguageToggle />
-      {/* Big centered logo */}
+      {/* Big centered logo — only navigates (self-link, back to /admin) for
+          super admins; a no-op mark for a regular account manager viewing
+          their own scoped admin panel. */}
       <div className="pt-6 pb-4 flex flex-col items-center relative z-10">
-        <Link href="/"><Logo size="xl" animate={false} /></Link>
+        {isSuperAdmin ? (
+          <Link href="/admin"><Logo size="xl" animate={false} /></Link>
+        ) : (
+          <Logo size="xl" animate={false} />
+        )}
         <div className="flex items-center gap-3 mt-3">
           {currentUser && (
             <span className="text-xs px-2.5 py-1 rounded-full font-bold"
