@@ -10,7 +10,7 @@ import { useHydrated } from '@/lib/use-hydrated';
 import { getDeviceId } from '@/lib/device-id';
 import { api } from '@/lib/api';
 import LanguageToggle from '@/components/ui/LanguageToggle';
-import Logo from '@/components/ui/Logo';
+import HomeLogo from '@/components/ui/HomeLogo';
 import Footer from '@/components/ui/Footer';
 import ParticleBackground from '@/components/ui/ParticleBackground';
 import Webcam from 'react-webcam';
@@ -627,7 +627,7 @@ export default function CapturePhotoPage() {
         >
           {/* Logo */}
           <div className="mb-3">
-            <Logo size="lg" />
+            <HomeLogo size="lg" />
           </div>
 
           {/* Personal welcome */}
@@ -735,7 +735,7 @@ export default function CapturePhotoPage() {
       {/* App Header */}
       <div className="app-header flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
-          <Logo size="lg" animate={false} />
+          <HomeLogo size="lg" animate={false} />
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <motion.div
@@ -946,7 +946,7 @@ export default function CapturePhotoPage() {
 
               {/* Big Logo */}
               <div className="mb-2">
-                <Logo size="lg" />
+                <HomeLogo size="lg" />
               </div>
 
               <motion.button className="btn-glow w-full text-lg" whileTap={{ scale: 0.96 }} onClick={() => setMode('camera')}>
