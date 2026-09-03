@@ -171,7 +171,7 @@ export const api = {
 
   // ===== Photos =====
   async getPhotos(eventId?: string) {
-    const res = await fetch(`${BASE}/api/photos?eventId=${eventId || 'all'}`);
+    const res = await fetch(`${BASE}/api/photos?eventId=${eventId || 'all'}`, { headers: authHeaders() });
     return handleJson(res, 'Failed to load photos');
   },
   async submitPhoto(data: { eventId: string; overlayId: string; image: string; rawImage?: string; deviceId: string; phoneNumber: string }) {

@@ -2,8 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { moderateImage } from '@/lib/moderation';
 import { uploadToDropbox } from '@/lib/dropbox';
+import { requireSuperAdmin } from '@/lib/auth';
 
+// Listing photos (with each guest's phone number) is site management —
+// admins only. Only the admin panel's gallery ever calls this.
 export async function GET(request: NextRequest) {
+  if (!(await requireSuperAdmin(request))) {
+    return NextResponse.json({ error: 'Site management is restricted to admins' }, { status: 403 });
+  }
   const eventId = request.nextUrl.searchParams.get('eventId');
 
   const where = eventId && eventId !== 'all' ? { eventId } : {};

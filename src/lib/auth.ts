@@ -2,7 +2,20 @@ import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
 import { prisma } from './db';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'silver-photobooth-secret-2026';
+// No fallback: a hardcoded secret here would sit in this repo's public
+// GitHub history forever. If it's missing, every login token (including
+// super_admin ones) would be forgeable by anyone who read the source —
+// fail loudly at the point of use instead of silently signing with a known
+// value. (Checked lazily, not at module load, so `next build`'s static
+// route analysis — which imports this file without a real request — still
+// succeeds even before the env var is configured in that environment.)
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is not set.');
+  }
+  return secret;
+}
 const TOKEN_EXPIRY = '7d';
 
 export type UserRole = 'super_admin' | 'account_manager';
@@ -31,14 +44,14 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 export function createToken(user: { id: string; email: string; role: string }): string {
   return jwt.sign(
     { userId: user.id, email: user.email, role: user.role } as JWTPayload,
-    JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: TOKEN_EXPIRY }
   );
 }
 
 export function verifyToken(token: string): JWTPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as JWTPayload;
+    return jwt.verify(token, getJwtSecret()) as JWTPayload;
   } catch {
     return null;
   }
