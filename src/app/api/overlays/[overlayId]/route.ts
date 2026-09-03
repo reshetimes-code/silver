@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { requireSuperAdmin } from '@/lib/auth';
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ overlayId: string }> }) {
+  if (!(await requireSuperAdmin(request))) {
+    return NextResponse.json({ error: 'Site management is restricted to admins' }, { status: 403 });
+  }
   const { overlayId } = await params;
   const body = await request.json();
   const overlay = await prisma.overlay.update({
@@ -15,7 +19,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   return NextResponse.json(overlay);
 }
 
-export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ overlayId: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ overlayId: string }> }) {
+  if (!(await requireSuperAdmin(request))) {
+    return NextResponse.json({ error: 'Site management is restricted to admins' }, { status: 403 });
+  }
   const { overlayId } = await params;
   await prisma.overlay.delete({ where: { id: overlayId } });
   return NextResponse.json({ success: true });

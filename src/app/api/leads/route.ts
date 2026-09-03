@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { getUserFromRequest } from '@/lib/auth';
+import { requireSuperAdmin } from '@/lib/auth';
 
 // POST /api/leads — public (called from event page)
 export async function POST(req: NextRequest) {
@@ -41,8 +41,8 @@ export async function POST(req: NextRequest) {
 // PATCH /api/leads — auth required, update handled status
 export async function PATCH(req: NextRequest) {
   try {
-    const user = await getUserFromRequest(req as unknown as Request);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const user = await requireSuperAdmin(req as unknown as Request);
+    if (!user) return NextResponse.json({ error: 'Site management is restricted to admins' }, { status: 403 });
 
     const { id, handled } = await req.json();
     if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
@@ -73,16 +73,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ exists: !!existing });
     }
 
-    // Auth required for full list
-    const user = await getUserFromRequest(req as unknown as Request);
+    // Full list is site management — admins only.
+    const user = await requireSuperAdmin(req as unknown as Request);
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Site management is restricted to admins' }, { status: 403 });
     }
 
-    const isSuperAdmin = user.role === 'super_admin';
-
     const leads = await prisma.lead.findMany({
-      where: isSuperAdmin ? {} : { ownerId: user.id },
       include: {
         owner: { select: { name: true, email: true } },
         sourceEvent: { select: { name: true } },
@@ -100,8 +97,8 @@ export async function GET(req: NextRequest) {
 // DELETE /api/leads — auth required
 export async function DELETE(req: NextRequest) {
   try {
-    const user = await getUserFromRequest(req as unknown as Request);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const user = await requireSuperAdmin(req as unknown as Request);
+    if (!user) return NextResponse.json({ error: 'Site management is restricted to admins' }, { status: 403 });
 
     const { id } = await req.json();
     if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });

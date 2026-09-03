@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { requireSuperAdmin } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
+  if (!(await requireSuperAdmin(request))) {
+    return NextResponse.json({ error: 'Site management is restricted to admins' }, { status: 403 });
+  }
   try {
     const formData = await request.formData();
     const file = formData.get('overlay') as File;

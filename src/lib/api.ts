@@ -153,17 +153,17 @@ export const api = {
     formData.append('overlay', file);
     formData.append('name', name);
     if (eventId) formData.append('eventId', eventId);
-    const res = await fetch(`${BASE}/api/upload-overlay`, { method: 'POST', body: formData });
+    const res = await fetch(`${BASE}/api/upload-overlay`, { method: 'POST', headers: authHeaders(), body: formData });
     return handleJson(res, 'Failed to upload frame');
   },
   async deleteOverlay(id: string) {
-    const res = await fetch(`${BASE}/api/overlays/${id}`, { method: 'DELETE' });
+    const res = await fetch(`${BASE}/api/overlays/${id}`, { method: 'DELETE', headers: authHeaders() });
     return handleJson(res, 'Failed to delete frame');
   },
   async updateOverlay(id: string, data: { name?: string; eventId?: string | null }) {
     const res = await fetch(`${BASE}/api/overlays/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(data),
     });
     return handleJson(res, 'Failed to update frame');
@@ -189,19 +189,19 @@ export const api = {
   async updatePhoto(id: string, data: Record<string, unknown>) {
     const res = await fetch(`${BASE}/api/photos/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(data),
     });
     return handleJson(res, 'Failed to update photo');
   },
   async deletePhoto(id: string) {
-    const res = await fetch(`${BASE}/api/photos/${id}`, { method: 'DELETE' });
+    const res = await fetch(`${BASE}/api/photos/${id}`, { method: 'DELETE', headers: authHeaders() });
     return handleJson(res, 'Failed to delete photo');
   },
   async deleteEventPhotos(eventId: string) {
     const photos = await api.getPhotos(eventId);
     for (const p of photos) {
-      const res = await fetch(`${BASE}/api/photos/${p.id}`, { method: 'DELETE' });
+      const res = await fetch(`${BASE}/api/photos/${p.id}`, { method: 'DELETE', headers: authHeaders() });
       await handleJson(res, 'Failed to delete photo');
     }
   },
@@ -255,7 +255,7 @@ export const api = {
   async sendToPrint(photoIds: string[]) {
     const res = await fetch(`${BASE}/api/print-batch`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ photoIds }),
     });
     return handleJson(res, 'Failed to send photos to print');

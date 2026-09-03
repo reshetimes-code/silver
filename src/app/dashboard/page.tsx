@@ -140,14 +140,18 @@ export default function DashboardPage() {
 
                 {/* Menu items */}
                 <nav className="space-y-1">
-                  <Link href="/admin" onClick={() => setMenuOpen(false)}
-                    className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-white/70 hover:bg-white/5 active:bg-white/10 transition-colors">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="1.5">
-                      <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
-                      <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
-                    </svg>
-                    {he ? 'לוח בקרה' : 'Admin Panel'}
-                  </Link>
+                  {/* Site management is admins-only — a regular account
+                      holder would just get bounced back here anyway. */}
+                  {isSuperAdmin && (
+                    <Link href="/admin" onClick={() => setMenuOpen(false)}
+                      className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-white/70 hover:bg-white/5 active:bg-white/10 transition-colors">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="1.5">
+                        <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+                        <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
+                      </svg>
+                      {he ? 'לוח בקרה' : 'Admin Panel'}
+                    </Link>
+                  )}
 
                   <Link href="/dashboard" onClick={() => setMenuOpen(false)}
                     className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-white/70 hover:bg-white/5 active:bg-white/10 transition-colors">
@@ -168,16 +172,18 @@ export default function DashboardPage() {
                     {he ? 'English' : 'עברית'}
                   </button>
 
-                  <div className="pt-3 mt-2 border-t border-[rgba(212,175,55,0.12)]">
-                    <p className="text-[9px] uppercase tracking-[0.2em] text-white/20 px-3 mb-1">{he ? 'שיווק' : 'Marketing'}</p>
-                    <Link href="/admin?tab=leads" onClick={() => setMenuOpen(false)}
-                      className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-white/70 hover:bg-white/5 active:bg-white/10 transition-colors">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="1.5">
-                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                      </svg>
-                      {he ? 'לידים חדשים' : 'New Leads'}
-                    </Link>
-                  </div>
+                  {isSuperAdmin && (
+                    <div className="pt-3 mt-2 border-t border-[rgba(212,175,55,0.12)]">
+                      <p className="text-[9px] uppercase tracking-[0.2em] text-white/20 px-3 mb-1">{he ? 'שיווק' : 'Marketing'}</p>
+                      <Link href="/admin?tab=leads" onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-white/70 hover:bg-white/5 active:bg-white/10 transition-colors">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="1.5">
+                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                        </svg>
+                        {he ? 'לידים חדשים' : 'New Leads'}
+                      </Link>
+                    </div>
+                  )}
 
                   <div className="pt-4 border-t border-white/10 mt-4">
                     <button onClick={handleLogout}
@@ -264,11 +270,17 @@ export default function DashboardPage() {
           >
             <div className="text-4xl mb-3">📷</div>
             <p className="text-white/30 text-sm">{he ? 'אין אירועים פעילים' : 'No active events'}</p>
-            <Link href="/admin">
-              <button className="btn-glow mt-4 text-sm w-full">
-                {he ? 'צור אירוע חדש' : 'Create New Event'}
-              </button>
-            </Link>
+            {isSuperAdmin ? (
+              <Link href="/admin">
+                <button className="btn-glow mt-4 text-sm w-full">
+                  {he ? 'צור אירוע חדש' : 'Create New Event'}
+                </button>
+              </Link>
+            ) : (
+              <p className="text-white/20 text-xs mt-3">
+                {he ? 'פנה למנהל האתר כדי ליצור אירוע חדש' : 'Contact a site admin to create a new event'}
+              </p>
+            )}
           </motion.div>
         )}
       </main>

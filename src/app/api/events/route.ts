@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { getUserFromRequest, isSuperAdmin } from '@/lib/auth';
+import { getUserFromRequest, isSuperAdmin, requireSuperAdmin } from '@/lib/auth';
 import { createEventDropboxFolder } from '@/lib/dropbox';
 
 export async function GET(request: NextRequest) {
@@ -35,7 +35,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const user = await getUserFromRequest(request);
+  const user = await requireSuperAdmin(request);
+  if (!user) {
+    return NextResponse.json({ error: 'Site management is restricted to admins' }, { status: 403 });
+  }
   const body = await request.json();
 
   const event = await prisma.event.create({
@@ -44,7 +47,7 @@ export async function POST(request: NextRequest) {
       date: body.date,
       maxPrintsPerDevice: body.maxPrintsPerDevice || 5,
       active: true,
-      ownerId: user?.id || null,
+      ownerId: user.id,
     },
   });
 

@@ -73,6 +73,17 @@ export function isSuperAdmin(user: AuthUser | null): boolean {
   return user?.role === 'super_admin';
 }
 
+/**
+ * Site management (creating/editing/deleting events, frames, photos, leads,
+ * users; sending to print) is restricted to super admins only — everyone
+ * else gets a read-only personal dashboard of their own events. Every
+ * mutating API route should call this first and bail on null.
+ */
+export async function requireSuperAdmin(request: Request): Promise<AuthUser | null> {
+  const user = await getUserFromRequest(request);
+  return isSuperAdmin(user) ? user : null;
+}
+
 export function isAccountManager(user: AuthUser | null): boolean {
   return user?.role === 'account_manager' || user?.role === 'super_admin';
 }

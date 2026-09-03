@@ -29,9 +29,14 @@ export default function AdminAuth({ children, onUser }: AdminAuthProps) {
       return;
     }
     api.getMe().then((u) => {
-      if (u) {
+      if (u && u.role === 'super_admin') {
+        // Site management (this whole admin panel) is restricted to super
+        // admins — a regular account holder gets sent to their own
+        // read-only personal dashboard instead of a scoped admin view.
         setAuthenticated(true);
         onUser?.(u);
+      } else if (u) {
+        router.push('/dashboard');
       } else {
         router.push('/login');
       }
