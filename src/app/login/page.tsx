@@ -195,7 +195,12 @@ export default function LoginPage() {
         <button
           onClick={() => {
             const clientId = '1007500230578-edkmhl9fu4r7ontgllor0p403sejkom6.apps.googleusercontent.com';
-            const redirectUri = encodeURIComponent(`${window.location.origin}/api/auth/google/callback`);
+            // Always use the primary domain, regardless of which host served this
+            // page (e.g. the raw Cloud Run URL) — it must match the redirect_uri
+            // the server uses when exchanging the code for a token (see
+            // api/auth/google/callback/route.ts), or Google rejects the exchange
+            // with redirect_uri_mismatch.
+            const redirectUri = encodeURIComponent('https://qrselfie.com/api/auth/google/callback');
             const scope = encodeURIComponent('email profile');
             const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&prompt=select_account&access_type=offline`;
             window.location.href = url;

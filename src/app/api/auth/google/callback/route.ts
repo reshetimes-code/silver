@@ -6,20 +6,16 @@ import { createToken } from '@/lib/auth';
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!;
 
-// Derive the public-facing origin from the incoming request so that the same
-// build works on both qrselfie.com and the raw Cloud Run URL. The x-forwarded-host
-// header is set by Cloud Run's load-balancer and contains the real domain name
-// (e.g. "qrselfie.com"); fall back to the hardcoded primary domain when absent.
-function getPublicUrl(request: NextRequest): string {
-  const fwdHost = request.headers.get('x-forwarded-host');
-  const fwdProto = request.headers.get('x-forwarded-proto') || 'https';
-  if (fwdHost) return `${fwdProto}://${fwdHost}`;
-  // last-resort fallback — should never be hit in production
-  return 'https://qrselfie.com';
-}
+// The Google OAuth redirect_uri must be byte-identical between the initial
+// authorize request (built client-side in login/page.tsx) and this token
+// exchange, or Google rejects it with redirect_uri_mismatch. qrselfie.com is
+// the site's one primary domain, so hardcode it here instead of deriving the
+// origin from request headers (x-forwarded-host isn't reliably set when the
+// raw Cloud Run URL is hit directly, which previously caused the two sides
+// to disagree).
+const PUBLIC_URL = 'https://qrselfie.com';
 
 export async function GET(request: NextRequest) {
-  const PUBLIC_URL = getPublicUrl(request);
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
   const error = searchParams.get('error');
