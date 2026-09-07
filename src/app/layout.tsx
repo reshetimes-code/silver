@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Assistant } from "next/font/google";
 import "./globals.css";
 import AccessibilityWidget from "@/components/ui/AccessibilityWidget";
+import ImpersonationBanner from "@/components/ui/ImpersonationBanner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -61,6 +62,7 @@ export default function RootLayout({
         `}} />
       </head>
       <body className="min-h-dvh bg-party overscroll-none">
+        <ImpersonationBanner />
         {children}
         <AccessibilityWidget />
       </body>

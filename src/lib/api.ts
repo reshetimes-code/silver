@@ -106,6 +106,56 @@ export const api = {
     return handleJson(res, 'Failed to update user');
   },
 
+  async deleteUser(id: string) {
+    const res = await fetch(`${BASE}/api/users`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ id }),
+    });
+    return handleJson(res, 'Failed to delete user');
+  },
+
+  // "Login as" — a super admin borrows another user's session to see the
+  // app exactly as they do. The admin's own session is stashed under
+  // impersonator-* so returnToAdmin() can restore it; loginAsUser() refuses
+  // to overwrite an already-stashed session so switching between two
+  // impersonated users can't lose the original admin session.
+  async loginAsUser(id: string) {
+    const res = await fetch(`${BASE}/api/users/${id}/impersonate`, {
+      method: 'POST',
+      headers: authHeaders(),
+    });
+    const data = await handleJson(res, 'Failed to log in as user');
+    if (typeof window !== 'undefined') {
+      if (!localStorage.getItem('impersonator-token')) {
+        localStorage.setItem('impersonator-token', localStorage.getItem('auth-token') || '');
+        localStorage.setItem('impersonator-user', localStorage.getItem('auth-user') || '');
+      }
+      localStorage.setItem('auth-token', data.token);
+      localStorage.setItem('auth-user', JSON.stringify(data.user));
+    }
+    return data;
+  },
+
+  isImpersonating() {
+    if (typeof window === 'undefined') return false;
+    return !!localStorage.getItem('impersonator-token');
+  },
+
+  // Restores the stashed admin session. Returns false (and changes nothing)
+  // if there was nothing to return to.
+  returnToAdmin(): boolean {
+    if (typeof window === 'undefined') return false;
+    const token = localStorage.getItem('impersonator-token');
+    const user = localStorage.getItem('impersonator-user');
+    if (!token || !user) return false;
+    localStorage.setItem('auth-token', token);
+    localStorage.setItem('auth-user', user);
+    localStorage.removeItem('impersonator-token');
+    localStorage.removeItem('impersonator-user');
+    return true;
+  },
+
   // ===== Events =====
   async getEvents() {
     const res = await fetch(`${BASE}/api/events`, { headers: authHeaders() });

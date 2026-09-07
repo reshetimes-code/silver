@@ -199,7 +199,7 @@ export default function AdminPage() {
           {tab === 'overlays' && <OverlaysTab key="overlays" />}
           {tab === 'photos' && <PhotosTab key="photos" />}
           {tab === 'leads' && <LeadsTab key="leads" />}
-          {tab === 'users' && isSuperAdmin && <UsersTab key="users" />}
+          {tab === 'users' && isSuperAdmin && <UsersTab key="users" currentUserId={currentUser?.id} />}
         </AnimatePresence>
       </div>
     </div>
@@ -928,18 +928,29 @@ function PhotosTab() {
 
 // ===================== QR CODE =====================
 // ===================== USERS TAB (Super Admin) =====================
-function UsersTab() {
+function UsersTab({ currentUserId }: { currentUserId?: string }) {
   const { locale } = useStore();
   const he = locale === 'he';
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState<'account_manager' | 'super_admin'>('account_manager');
+  const [errors, setErrors] = useState<{ name?: boolean; email?: boolean }>({});
+  const loader = useLoader();
 
-  useEffect(() => {
+  const loadUsers = () => {
     api.getUsers().then((data: UserData[]) => { setUsers(data); setLoading(false); }).catch((err) => {
       setLoading(false);
       showActionError(err);
     });
-  }, []);
+  };
+
+  useEffect(() => { loadUsers(); }, []);
 
   const toggleActive = async (user: UserData) => withErrorAlert(async () => {
     await api.updateUser(user.id, { active: !user.active });
@@ -952,6 +963,72 @@ function UsersTab() {
     setUsers(users.map(u => u.id === user.id ? { ...u, role: newRole } : u));
   });
 
+  const resetForm = () => {
+    setName(''); setEmail(''); setPhone(''); setPassword(''); setRole('account_manager');
+    setShowForm(false); setEditingId(null); setErrors({});
+  };
+
+  const startEdit = (user: UserData) => {
+    setName(user.name); setEmail(user.email); setPhone(user.phone || '');
+    setPassword(''); setRole(user.role as 'account_manager' | 'super_admin');
+    setEditingId(user.id); setShowForm(true);
+  };
+
+  const handleSave = async () => {
+    const errs = { name: !name.trim(), email: !email.trim() };
+    setErrors(errs);
+    if (errs.name || errs.email) {
+      Swal.fire({ icon: 'warning', title: he ? 'שדות חסרים' : 'Missing Fields', text: he ? 'נא למלא שם ואימייל' : 'Please fill in name and email', background: '#0a0a0a', color: '#fff', confirmButtonColor: '#D4AF37' });
+      return;
+    }
+    if (password && password.length < 6) {
+      Swal.fire({ icon: 'warning', title: he ? 'סיסמה קצרה מדי' : 'Password too short', text: he ? 'הסיסמה חייבת להכיל 6 תווים לפחות' : 'Password must be at least 6 characters', background: '#0a0a0a', color: '#fff', confirmButtonColor: '#D4AF37' });
+      return;
+    }
+    if (!editingId) return; // this form only edits existing users
+    await loader.run(he ? 'שומר שינויים...' : 'Saving changes...', async () => {
+      await api.updateUser(editingId, { name, email, phone, role, ...(password ? { password } : {}) });
+      resetForm();
+      loadUsers();
+      Swal.fire({ icon: 'success', title: he ? '✅ נשמר בהצלחה!' : '✅ Saved!', timer: 1800, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
+    });
+  };
+
+  const handleDelete = async (user: UserData) => {
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: he ? 'למחוק משתמש?' : 'Delete user?',
+      html: he
+        ? `<p style="color:rgba(255,255,255,0.6);font-size:14px;">המשתמש <b style="color:white">${user.name}</b> יימחק לצמיתות.<br/>האירועים והלידים שלו (${user._count.events}) יישארו במערכת אך יהפכו לבלתי-משויכים.</p>`
+        : `<p style="color:rgba(255,255,255,0.6);font-size:14px;">User <b style="color:white">${user.name}</b> will be permanently deleted.<br/>Their events and leads (${user._count.events}) will stay in the system but become unassigned.</p>`,
+      showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#333',
+      confirmButtonText: he ? '🗑️ מחק' : '🗑️ Delete', cancelButtonText: he ? 'ביטול' : 'Cancel',
+      background: '#0a0a0a', color: '#fff',
+    });
+    if (!result.isConfirmed) return;
+    await loader.run(he ? 'מוחק משתמש...' : 'Deleting user...', async () => {
+      await api.deleteUser(user.id);
+      setUsers(prev => prev.filter(u => u.id !== user.id));
+      Swal.fire({ icon: 'success', title: he ? 'נמחק!' : 'Deleted!', timer: 1500, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
+    });
+  };
+
+  const handleLoginAs = async (user: UserData) => {
+    const result = await Swal.fire({
+      icon: 'question',
+      title: he ? `להיכנס לחשבון של ${user.name}?` : `Log in as ${user.name}?`,
+      text: he ? 'תעבור לצפות במערכת בדיוק כפי שהוא רואה אותה. תוכל לחזור לניהול בכל רגע.' : "You'll switch to viewing the app exactly as they see it. You can return to admin anytime.",
+      showCancelButton: true, confirmButtonColor: '#D4AF37', cancelButtonColor: '#333',
+      confirmButtonText: he ? 'היכנס' : 'Log in', cancelButtonText: he ? 'ביטול' : 'Cancel',
+      background: '#0a0a0a', color: '#fff',
+    });
+    if (!result.isConfirmed) return;
+    await withErrorAlert(async () => {
+      const data = await api.loginAsUser(user.id);
+      window.location.href = data.user.role === 'super_admin' ? '/admin' : '/dashboard';
+    });
+  };
+
   if (loading) {
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-center py-12">
@@ -963,46 +1040,125 @@ function UsersTab() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+      {loader.visible && loader.message && <BrandedLoader message={loader.message} />}
       <h2 className="text-lg font-bold text-white mb-4">
         {he ? 'ניהול משתמשים' : 'User Management'}
         <span className="text-xs text-white/30 font-normal ml-2">({users.length})</span>
       </h2>
 
-      <div className="space-y-3">
-        {users.map((user) => (
-          <div key={user.id} className="glass-card p-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-bold text-white truncate">{user.name}</h3>
-                <p className="text-xs text-white/40 truncate">{user.email}</p>
+      {/* Edit form — opened via the "Edit" action on a row below */}
+      <AnimatePresence>
+        {showForm && editingId && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+            className="glass-card p-5 mb-5 overflow-hidden">
+            <h3 className="text-lg font-bold text-white mb-4">{he ? 'ערוך משתמש' : 'Edit User'}</h3>
+            <div className="space-y-3">
+              <div>
+                <label className={`block text-xs mb-1 ${errors.name ? 'text-red-400' : 'text-white/50'}`}>{he ? 'שם' : 'Name'} *</label>
+                <input type="text" value={name} onChange={(e) => { setName(e.target.value); setErrors((p) => ({ ...p, name: false })); }}
+                  className={`w-full px-4 py-3 rounded-xl bg-white/8 border text-white placeholder-white/25 focus:outline-none text-base ${errors.name ? 'border-red-500' : 'border-white/15 focus:border-primary'}`} />
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-                  user.role === 'super_admin'
-                    ? 'bg-primary/20 text-[#D4AF37]'
-                    : 'bg-white/8 text-white/50'
-                }`}>
-                  {user.role === 'super_admin' ? (he ? 'מנהל אתר' : 'Super Admin') : (he ? 'מנהל חשבון' : 'Account Mgr')}
-                </span>
-                <span className={`w-2 h-2 rounded-full ${user.active ? 'bg-green-500' : 'bg-red-500'}`} />
+              <div>
+                <label className={`block text-xs mb-1 ${errors.email ? 'text-red-400' : 'text-white/50'}`}>{he ? 'אימייל' : 'Email'} *</label>
+                <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setErrors((p) => ({ ...p, email: false })); }}
+                  className={`w-full px-4 py-3 rounded-xl bg-white/8 border text-white placeholder-white/25 focus:outline-none text-base ${errors.email ? 'border-red-500' : 'border-white/15 focus:border-primary'}`} dir="ltr" />
+              </div>
+              <div>
+                <label className="block text-xs text-white/50 mb-1">{he ? 'טלפון' : 'Phone'}</label>
+                <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-white/8 border border-white/15 text-white focus:border-primary focus:outline-none text-base" dir="ltr" />
+              </div>
+              <div>
+                <label className="block text-xs text-white/50 mb-1">{he ? 'תפקיד' : 'Role'}</label>
+                <select value={role} onChange={(e) => setRole(e.target.value as 'account_manager' | 'super_admin')}
+                  disabled={editingId === currentUserId}
+                  className="w-full px-4 py-3 rounded-xl bg-white/8 border border-white/15 text-white focus:border-primary focus:outline-none text-base disabled:opacity-50">
+                  <option value="account_manager" className="bg-[#111]">{he ? 'מנהל חשבון' : 'Account Manager'}</option>
+                  <option value="super_admin" className="bg-[#111]">{he ? 'מנהל אתר' : 'Super Admin'}</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-white/50 mb-1">{he ? 'סיסמה חדשה (השאר ריק כדי לא לשנות)' : 'New password (leave blank to keep current)'}</label>
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={6}
+                  className="w-full px-4 py-3 rounded-xl bg-white/8 border border-white/15 text-white focus:border-primary focus:outline-none text-base" dir="ltr" />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button className="btn-secondary flex-1" onClick={resetForm}>{he ? 'ביטול' : 'Cancel'}</button>
+                <button className="btn-glow flex-1" onClick={handleSave}>{he ? 'שמור' : 'Save'}</button>
               </div>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-            <div className="flex items-center justify-between text-xs text-white/30">
-              <div className="flex items-center gap-3">
-                {user.phone && <span>📱 {user.phone}</span>}
-                <span>📅 {new Date(user.createdAt).toLocaleDateString()}</span>
-                <span>🎉 {user._count.events} {he ? 'אירועים' : 'events'}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => toggleActive(user)}
-                  className={`px-2 py-1 rounded text-xs transition-colors ${user.active ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20' : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'}`}>
-                  {user.active ? (he ? 'השבת' : 'Disable') : (he ? 'הפעל' : 'Enable')}
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
+      <div className="glass-card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm" dir={he ? 'rtl' : 'ltr'}>
+            <thead>
+              <tr className="border-b border-white/10 text-white/40 text-xs uppercase">
+                <th className="text-start px-3 py-2.5 font-medium">{he ? 'שם' : 'Name'}</th>
+                <th className="text-start px-3 py-2.5 font-medium">{he ? 'אימייל' : 'Email'}</th>
+                <th className="text-start px-3 py-2.5 font-medium">{he ? 'טלפון' : 'Phone'}</th>
+                <th className="text-start px-3 py-2.5 font-medium">{he ? 'תפקיד' : 'Role'}</th>
+                <th className="text-start px-3 py-2.5 font-medium">{he ? 'סטטוס' : 'Status'}</th>
+                <th className="text-start px-3 py-2.5 font-medium">{he ? 'אירועים' : 'Events'}</th>
+                <th className="text-start px-3 py-2.5 font-medium">{he ? 'נרשם' : 'Joined'}</th>
+                <th className="text-start px-3 py-2.5 font-medium">{he ? 'פעולות' : 'Actions'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((user) => {
+                const isSelf = user.id === currentUserId;
+                return (
+                  <tr key={user.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03] align-middle">
+                    <td className="px-3 py-3 text-white font-bold whitespace-nowrap">
+                      {user.name}{isSelf && <span className="text-white/30 font-normal"> ({he ? 'אתה' : 'you'})</span>}
+                    </td>
+                    <td className="px-3 py-3 text-white/60 whitespace-nowrap" dir="ltr">{user.email}</td>
+                    <td className="px-3 py-3 text-white/60 whitespace-nowrap" dir="ltr">{user.phone || '—'}</td>
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      <button onClick={() => toggleRole(user)} disabled={isSelf}
+                        className={`text-xs px-2 py-0.5 rounded-full font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                          user.role === 'super_admin' ? 'bg-primary/20 text-[#D4AF37] hover:bg-primary/30' : 'bg-white/8 text-white/50 hover:bg-white/15'
+                        }`} title={isSelf ? '' : (he ? 'לחץ להחלפת תפקיד' : 'Click to switch role')}>
+                        {user.role === 'super_admin' ? (he ? 'מנהל אתר' : 'Super Admin') : (he ? 'מנהל חשבון' : 'Account Mgr')}
+                      </button>
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      <button onClick={() => toggleActive(user)} disabled={isSelf}
+                        className={`flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full disabled:opacity-50 disabled:cursor-not-allowed ${user.active ? 'text-green-400 hover:bg-green-500/10' : 'text-red-400 hover:bg-red-500/10'}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${user.active ? 'bg-green-500' : 'bg-red-500'}`} />
+                        {user.active ? (he ? 'פעיל' : 'Active') : (he ? 'מושבת' : 'Disabled')}
+                      </button>
+                    </td>
+                    <td className="px-3 py-3 text-white/50 whitespace-nowrap">{user._count.events}</td>
+                    <td className="px-3 py-3 text-white/40 whitespace-nowrap">{new Date(user.createdAt).toLocaleDateString()}</td>
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => startEdit(user)} title={he ? 'ערוך' : 'Edit'}
+                          className="px-2 py-1 rounded-lg text-xs font-bold bg-blue-500/15 text-blue-400 hover:bg-blue-500/25">
+                          {he ? 'ערוך' : 'Edit'}
+                        </button>
+                        {!isSelf && (
+                          <button onClick={() => handleLoginAs(user)} title={he ? 'היכנס לחשבון' : 'Log in as'}
+                            className="px-2 py-1 rounded-lg text-xs font-bold bg-purple-500/15 text-purple-400 hover:bg-purple-500/25">
+                            {he ? 'כניסה' : 'Login as'}
+                          </button>
+                        )}
+                        {!isSelf && (
+                          <button onClick={() => handleDelete(user)} title={he ? 'מחק' : 'Delete'}
+                            className="px-2 py-1 rounded-lg text-xs font-bold bg-red-500/15 text-red-400 hover:bg-red-500/25">
+                            🗑️
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
 
         {users.length === 0 && (
           <div className="text-center py-8 text-white/30 text-sm">

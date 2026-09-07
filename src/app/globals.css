@@ -4,6 +4,12 @@
   font-family: var(--font-assistant), var(--font-geist-sans), sans-serif;
 }
 
+/* Room for the "logged in as" bar (see ImpersonationBanner) so it doesn't
+   sit on top of each page's own sticky header. */
+body.impersonating {
+  padding-top: 36px;
+}
+
 :root {
   --background: #000000;
   --foreground: #ffffff;
