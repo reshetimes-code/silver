@@ -19,9 +19,29 @@ model User {
   updatedAt    DateTime @updatedAt
   events       Event[]
   leads        Lead[]
+  dropboxAccount DropboxAccount?
 
   @@index([email])
   @@index([role])
+}
+
+// Each account manager can connect their own Dropbox account (OAuth) and
+// pick a destination folder — photos for their events upload there instead
+// of the single shared Dropbox account configured via env vars. Kept as its
+// own table (rather than columns on User) so a bare `prisma.user.findMany()`
+// elsewhere in the app can never accidentally select/leak the refresh token.
+model DropboxAccount {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  dropboxAccountId String   // Dropbox's own "account_id", e.g. "dbid:AAB..."
+  accountEmail     String
+  accountName      String   @default("")
+  refreshToken     String   @db.Text
+  rootFolderPath   String?  // chosen destination folder; null until picked
+  connectedAt      DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Event {

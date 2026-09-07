@@ -815,29 +815,32 @@ export default function CapturePhotoPage() {
             </div>
           )}
 
-          {/* Lens selector — floats above bottom controls */}
+          {/* Lens/zoom selector — floats above bottom controls. Big +/- buttons step
+              through the phone's available back lenses (no unreliable per-lens labels). */}
           {facingMode === 'environment' && videoDevices.filter(d => !d.label.toLowerCase().includes('front')).length > 1 && (
-            <div className="absolute bottom-28 left-0 right-0 z-20 flex items-center justify-center gap-2">
-              {videoDevices
-                .filter(d => !d.label.toLowerCase().includes('front'))
-                .map((device, i) => {
-                  const label = device.label.toLowerCase();
-                  const zoomLabel = label.includes('ultra') || label.includes('wide') ? '0.5×'
-                    : label.includes('tele') ? '2×'
-                    : `${i + 1}×`;
-                  const isActive = selectedDeviceId === device.deviceId;
-                  return (
-                    <button key={device.deviceId} onClick={() => setSelectedDeviceId(device.deviceId)}
-                      className="px-3 py-1.5 rounded-full text-xs font-bold transition-all"
-                      style={{
-                        background: isActive ? 'rgba(255,200,0,0.9)' : 'rgba(0,0,0,0.5)',
-                        color: isActive ? '#000' : '#FFD700',
-                        border: '1px solid rgba(255,200,0,0.5)',
-                      }}>
-                      {zoomLabel}
+            <div className="absolute bottom-28 left-0 right-0 z-20 flex items-center justify-center gap-6">
+              {(() => {
+                const backDevices = videoDevices.filter(d => !d.label.toLowerCase().includes('front'));
+                const currentIndex = Math.max(0, backDevices.findIndex(d => d.deviceId === selectedDeviceId));
+                const step = (delta: number) => {
+                  const next = (currentIndex + delta + backDevices.length) % backDevices.length;
+                  setSelectedDeviceId(backDevices[next].deviceId);
+                };
+                return (
+                  <>
+                    <button className="zoom-btn" onClick={() => step(-1)} aria-label={he ? 'הקטן זום' : 'Zoom out'}>
+                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M5 12h14" strokeLinecap="round" />
+                      </svg>
                     </button>
-                  );
-                })}
+                    <button className="zoom-btn" onClick={() => step(1)} aria-label={he ? 'הגדל זום' : 'Zoom in'}>
+                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+                      </svg>
+                    </button>
+                  </>
+                );
+              })()}
             </div>
           )}
 

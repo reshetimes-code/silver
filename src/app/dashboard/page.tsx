@@ -162,6 +162,16 @@ export default function DashboardPage() {
                     {he ? 'האירועים שלי' : 'My Events'}
                   </Link>
 
+                  <Link href="/dashboard/storage" onClick={() => setMenuOpen(false)}
+                    className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-white/70 hover:bg-white/5 active:bg-white/10 transition-colors">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="1.5">
+                      <path d="M21 8v10a2 2 0 01-2 2H5a2 2 0 01-2-2V8" />
+                      <path d="M3 8l2.5-4h13L21 8" />
+                      <path d="M3 8h18" />
+                    </svg>
+                    {he ? 'אחסון / דרופבוקס' : 'Storage / Dropbox'}
+                  </Link>
+
                   <button onClick={() => { toggleLocale(); setMenuOpen(false); }}
                     className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-white/70 hover:bg-white/5 active:bg-white/10 transition-colors">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="1.5">

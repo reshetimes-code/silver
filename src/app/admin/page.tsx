@@ -114,7 +114,7 @@ function useLoader() {
 type Tab = 'events' | 'overlays' | 'photos' | 'users' | 'leads';
 
 interface AuthUser { id: string; email: string; name: string; role: string; }
-interface EventData { id: string; name: string; date: string; maxPrintsPerDevice: number; active: boolean; owner?: { name: string; email: string }; }
+interface EventData { id: string; name: string; date: string; maxPrintsPerDevice: number; active: boolean; ownerId?: string | null; owner?: { id: string; name: string; email: string }; }
 interface OverlayData { id: string; name: string; url: string; }
 interface PhotoData { id: string; eventId: string; photoUrl: string; overlayId: string | null; deviceId: string; phoneNumber: string; moderationStatus: string; moderationReason: string | null; printStatus: string; createdAt: string; event?: EventData; overlay?: OverlayData; }
 interface UserData { id: string; email: string; name: string; role: string; active: boolean; phone: string; createdAt: string; _count: { events: number }; }
@@ -195,7 +195,7 @@ export default function AdminPage() {
       </div>
       <div className="relative z-10 px-4 pb-24 pt-4 max-w-3xl mx-auto">
         <AnimatePresence mode="wait">
-          {tab === 'events' && <EventsTab key="events" />}
+          {tab === 'events' && <EventsTab key="events" isSuperAdmin={isSuperAdmin} />}
           {tab === 'overlays' && <OverlaysTab key="overlays" />}
           {tab === 'photos' && <PhotosTab key="photos" />}
           {tab === 'leads' && <LeadsTab key="leads" />}
@@ -208,7 +208,7 @@ export default function AdminPage() {
 }
 
 // ===================== EVENTS TAB =====================
-function EventsTab() {
+function EventsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const { locale, showLanguageToggle, setShowLanguageToggle } = useStore();
   const he = locale === 'he';
   const [events, setEvents] = useState<EventData[]>([]);
@@ -218,6 +218,8 @@ function EventsTab() {
   const [name, setName] = useState('');
   const [date, setDate] = useState('');
   const [maxPrints, setMaxPrints] = useState(5);
+  const [ownerId, setOwnerId] = useState(''); // '' = myself (the creating super admin)
+  const [managers, setManagers] = useState<UserData[]>([]);
   const [errors, setErrors] = useState<{ name?: boolean; date?: boolean }>({});
   const [loading, setLoading] = useState(true);
   const loader = useLoader();
@@ -231,8 +233,15 @@ function EventsTab() {
 
   useEffect(() => { loadEvents(); }, []);
 
+  // The owner picker (whose Dropbox account an event's photos route to) only
+  // matters — and is only allowed — for super admins.
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    api.getUsers().then((data: UserData[]) => setManagers(data.filter((u) => u.role === 'account_manager'))).catch(() => {});
+  }, [isSuperAdmin]);
+
   const resetForm = () => {
-    setName(''); setDate(''); setMaxPrints(5); setShowForm(false); setEditingId(null); setErrors({});
+    setName(''); setDate(''); setMaxPrints(5); setOwnerId(''); setShowForm(false); setEditingId(null); setErrors({});
   };
 
   const handleSave = async () => {
@@ -243,10 +252,11 @@ function EventsTab() {
       return;
     }
     await loader.run(editingId ? (he ? 'שומר שינויים...' : 'Saving changes...') : (he ? 'יוצר אירוע...' : 'Creating event...'), async () => {
+      const ownerData = isSuperAdmin && ownerId ? { ownerId } : {};
       if (editingId) {
-        await api.updateEvent(editingId, { name, date, maxPrintsPerDevice: maxPrints });
+        await api.updateEvent(editingId, { name, date, maxPrintsPerDevice: maxPrints, ...ownerData });
       } else {
-        await api.createEvent({ name, date, maxPrintsPerDevice: maxPrints });
+        await api.createEvent({ name, date, maxPrintsPerDevice: maxPrints, ...ownerData });
       }
       resetForm();
       loadEvents();
@@ -257,7 +267,7 @@ function EventsTab() {
   const startEdit = (id: string) => {
     const ev = events.find((e) => e.id === id);
     if (!ev) return;
-    setName(ev.name); setDate(ev.date); setMaxPrints(ev.maxPrintsPerDevice);
+    setName(ev.name); setDate(ev.date); setMaxPrints(ev.maxPrintsPerDevice); setOwnerId(ev.owner?.id || '');
     setEditingId(id); setShowForm(true);
   };
 
@@ -330,6 +340,21 @@ function EventsTab() {
                 <input type="number" value={maxPrints} onChange={(e) => setMaxPrints(parseInt(e.target.value) || 1)} min={1} max={50}
                   className="w-full px-4 py-3 rounded-xl bg-white/8 border border-white/15 text-white focus:border-primary focus:outline-none text-base" />
               </div>
+              {isSuperAdmin && (
+                <div>
+                  <label className="block text-xs text-white/50 mb-1">{he ? 'מנהל האירוע (בעל התיקייה בדרופבוקס)' : 'Event manager (Dropbox owner)'}</label>
+                  <select value={ownerId} onChange={(e) => setOwnerId(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-white/8 border border-white/15 text-white focus:border-primary focus:outline-none text-base">
+                    <option value="">{he ? '— אני —' : '— Myself —'}</option>
+                    {managers.map((m) => (
+                      <option key={m.id} value={m.id}>{m.name} ({m.email})</option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-white/25 mt-1">
+                    {he ? 'תמונות האירוע יעלו לדרופבוקס של המנהל שנבחר, אם חיבר אחד' : "Photos upload to the chosen manager's own Dropbox, if they've connected one"}
+                  </p>
+                </div>
+              )}
               <div className="flex gap-3 pt-2">
                 <button className="btn-secondary flex-1" onClick={resetForm}>{he ? 'ביטול' : 'Cancel'}</button>
                 <button className="btn-glow flex-1" onClick={handleSave}>{he ? 'שמור' : 'Save'}</button>

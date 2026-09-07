@@ -1,27 +1,12 @@
 import { prisma } from './db';
 import sharp from 'sharp';
 import { detectTransparentArea } from './overlay-fit';
+import { asciiSafeJson, sanitizeFolderName, refreshDropboxToken, getAccessTokenForUser } from './dropbox-oauth';
 
-// Cache the access token in memory
+// Cache the shared account's access token in memory (used for events whose
+// owner hasn't connected their own Dropbox account).
 let cachedAccessToken: string | null = null;
 let tokenExpiresAt = 0;
-
-/**
- * Dropbox requires the `Dropbox-API-Arg` header value to be pure ASCII (HTTP
- * headers can't carry raw UTF-8/Unicode — the Fetch API throws
- * "Cannot convert argument to a ByteString" for any character above 255).
- * Event/file names are often Hebrew or contain smart-quotes, so escape any
- * non-ASCII character as a unicode escape sequence — Dropbox's API parses
- * that back as normal JSON, decoding to the correct Unicode path server-side.
- * https://www.dropbox.com/developers/reference/json-encoding
- */
-function asciiSafeJson(obj: unknown): string {
-  const nonAscii = new RegExp('[' + String.fromCharCode(128) + '-' + String.fromCharCode(65535) + ']', 'g');
-  return JSON.stringify(obj).replace(nonAscii, (c) => {
-    const hex = c.charCodeAt(0).toString(16);
-    return String.fromCharCode(92) + 'u' + '0000'.slice(hex.length) + hex;
-  });
-}
 
 async function getAccessToken(): Promise<string> {
   if (cachedAccessToken && Date.now() < tokenExpiresAt) {
@@ -33,24 +18,14 @@ async function getAccessToken(): Promise<string> {
   const appSecret = process.env.DROPBOX_APP_SECRET;
 
   if (refreshToken && appKey && appSecret) {
-    const res = await fetch('https://api.dropboxapi.com/oauth2/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'refresh_token',
-        refresh_token: refreshToken,
-        client_id: appKey,
-        client_secret: appSecret,
-      }),
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      cachedAccessToken = data.access_token;
-      tokenExpiresAt = Date.now() + (data.expires_in - 300) * 1000;
-      return cachedAccessToken!;
+    try {
+      const { accessToken, expiresIn } = await refreshDropboxToken(refreshToken);
+      cachedAccessToken = accessToken;
+      tokenExpiresAt = Date.now() + (expiresIn - 300) * 1000;
+      return cachedAccessToken;
+    } catch (error) {
+      console.error('Dropbox refresh token failed:', error);
     }
-    console.error('Dropbox refresh token failed:', await res.text());
   }
 
   const staticToken = process.env.DROPBOX_ACCESS_TOKEN;
@@ -64,15 +39,26 @@ async function getAccessToken(): Promise<string> {
  * store on the event so all future photos land in exactly this folder even
  * if the event is later renamed. Returns null (never throws) if Dropbox
  * isn't reachable — event creation should still succeed either way.
+ *
+ * If the event's owner has connected their own Dropbox account and picked a
+ * destination folder, the subfolder is created there (under their chosen
+ * root) using their own access token. Otherwise falls back to today's
+ * shared-account behavior unchanged, so events with no connected owner keep
+ * working exactly as before.
  */
-export async function createEventDropboxFolder(eventName: string): Promise<string | null> {
+export async function createEventDropboxFolder(eventName: string, ownerId?: string | null): Promise<string | null> {
   try {
-    const accessToken = await getAccessToken();
+    const ownerAccount = await getAccessTokenForUser(ownerId);
+    const usingOwnAccount = !!ownerAccount?.rootFolderPath;
 
-    let dropboxFolder = process.env.DROPBOX_FOLDER || '/BeautifulPhotobooth/SelphieBooth/Computer1';
+    const accessToken = usingOwnAccount ? ownerAccount!.accessToken : await getAccessToken();
+
+    let dropboxFolder = usingOwnAccount
+      ? ownerAccount!.rootFolderPath!
+      : process.env.DROPBOX_FOLDER || '/BeautifulPhotobooth/SelphieBooth/Computer1';
     if (!dropboxFolder.startsWith('/')) dropboxFolder = '/' + dropboxFolder;
 
-    const safeEventName = eventName.replace(/[/\\:*?"<>|]/g, '_').trim() || 'Event';
+    const safeEventName = sanitizeFolderName(eventName, 'Event');
     const eventFolder = `${dropboxFolder}/${safeEventName}`;
 
     const res = await fetch('https://api.dropboxapi.com/2/files/create_folder_v2', {
@@ -173,14 +159,25 @@ async function compositePhotoWithOverlay(photoBase64: string, overlayBase64: str
 
 export async function uploadToDropbox(photoId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const accessToken = await getAccessToken();
-
     const photo = await prisma.photo.findUnique({
       where: { id: photoId },
       include: { event: true, overlay: true },
     });
 
     if (!photo) return { success: false, error: 'Photo not found' };
+
+    // Route to the event owner's own connected Dropbox account, but only if
+    // this event's stored folder actually lives under that account's chosen
+    // root — i.e. the event was created (or its folder assigned) after the
+    // owner connected. An event created earlier (shared-account folder, or
+    // an owner who connects Dropbox only *after* the fact) must keep using
+    // the shared account, since that's where its folder actually exists.
+    const ownerAccount = await getAccessTokenForUser(photo.event.ownerId);
+    const usingOwnAccount = !!(
+      ownerAccount?.rootFolderPath &&
+      photo.event.dropboxPath?.startsWith(ownerAccount.rootFolderPath)
+    );
+    const accessToken = usingOwnAccount ? ownerAccount!.accessToken : await getAccessToken();
 
     const finalBuffer = await compositePhotoWithOverlay(
       photo.photoUrl,

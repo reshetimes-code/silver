@@ -393,6 +393,32 @@ body {
   background: rgba(212, 175, 55, 0.15);
 }
 
+/* ===== ZOOM BUTTON (+/-) ===== */
+.zoom-btn {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: rgba(10, 10, 10, 0.6);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #F4E5B0;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: all 0.15s ease;
+}
+
+.zoom-btn:active {
+  transform: scale(0.88);
+  background: rgba(212, 175, 55, 0.2);
+}
+
+.zoom-btn:disabled {
+  opacity: 0.35;
+}
+
 /* ===== PRINT SUCCESS ===== */
 @keyframes checkmark {
   0% { stroke-dashoffset: 100; }

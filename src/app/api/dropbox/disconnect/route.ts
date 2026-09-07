@@ -1,0 +1,23 @@
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/db';
+import { getUserFromRequest } from '@/lib/auth';
+import { getAccessTokenForUser, revokeDropboxToken } from '@/lib/dropbox-oauth';
+
+export async function DELETE(request: Request) {
+  const user = await getUserFromRequest(request);
+  if (!user) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
+
+  // Best-effort revoke with Dropbox — the local disconnect proceeds either way.
+  try {
+    const account = await getAccessTokenForUser(user.id);
+    if (account) await revokeDropboxToken(account.accessToken);
+  } catch (err) {
+    console.error('Dropbox revoke-on-disconnect failed:', err);
+  }
+
+  await prisma.dropboxAccount.deleteMany({ where: { userId: user.id } });
+
+  return NextResponse.json({ success: true });
+}

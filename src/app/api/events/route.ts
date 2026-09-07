@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
       // Super admin sees all events
       const events = await prisma.event.findMany({
         orderBy: { createdAt: 'desc' },
-        include: { owner: { select: { name: true, email: true } } },
+        include: { owner: { select: { id: true, name: true, email: true } } },
       });
       return NextResponse.json(events);
     } else {
@@ -41,20 +41,32 @@ export async function POST(request: NextRequest) {
   }
   const body = await request.json();
 
+  // A super admin can create an event on behalf of any account manager, so
+  // that manager's own connected Dropbox account (and chosen folder) is what
+  // photos route to — defaults to the creating admin themself, as before.
+  let ownerId = user.id;
+  if (body.ownerId) {
+    const owner = await prisma.user.findUnique({ where: { id: body.ownerId } });
+    if (!owner) {
+      return NextResponse.json({ error: 'Owner not found' }, { status: 400 });
+    }
+    ownerId = owner.id;
+  }
+
   const event = await prisma.event.create({
     data: {
       name: body.name,
       date: body.date,
       maxPrintsPerDevice: body.maxPrintsPerDevice || 5,
       active: true,
-      ownerId: user.id,
+      ownerId,
     },
   });
 
   // Create the Dropbox folder right away so it exists before any photos are
   // taken. Best-effort: if Dropbox is unreachable, the event still gets
   // created and the folder falls back to being created lazily on first upload.
-  const dropboxPath = await createEventDropboxFolder(event.name);
+  const dropboxPath = await createEventDropboxFolder(event.name, event.ownerId);
   if (dropboxPath) {
     await prisma.event.update({ where: { id: event.id }, data: { dropboxPath } });
     event.dropboxPath = dropboxPath;

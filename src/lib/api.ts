@@ -116,7 +116,7 @@ export const api = {
     if (!res.ok) return null;
     return res.json();
   },
-  async createEvent(data: { name: string; date: string; maxPrintsPerDevice: number }) {
+  async createEvent(data: { name: string; date: string; maxPrintsPerDevice: number; ownerId?: string }) {
     const res = await fetch(`${BASE}/api/events`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -249,6 +249,40 @@ export const api = {
       body: JSON.stringify({ id }),
     });
     return handleJson(res, 'Failed to delete lead');
+  },
+
+  // ===== Dropbox (per-manager storage connection) =====
+  async getDropboxStatus() {
+    const res = await fetch(`${BASE}/api/dropbox/status`, { headers: authHeaders() });
+    return handleJson(res, 'Failed to load Dropbox status');
+  },
+  async getDropboxConnectUrl(): Promise<{ url: string }> {
+    const res = await fetch(`${BASE}/api/auth/dropbox/connect`, { headers: authHeaders() });
+    return handleJson(res, 'Failed to start Dropbox connection');
+  },
+  async listDropboxFolders(path: string) {
+    const res = await fetch(`${BASE}/api/dropbox/folders?path=${encodeURIComponent(path)}`, { headers: authHeaders() });
+    return handleJson(res, 'Failed to load Dropbox folders');
+  },
+  async createDropboxFolder(parentPath: string, name: string) {
+    const res = await fetch(`${BASE}/api/dropbox/folders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ parentPath, name }),
+    });
+    return handleJson(res, 'Failed to create Dropbox folder');
+  },
+  async selectDropboxFolder(path: string) {
+    const res = await fetch(`${BASE}/api/dropbox/select-folder`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ path }),
+    });
+    return handleJson(res, 'Failed to select Dropbox folder');
+  },
+  async disconnectDropbox() {
+    const res = await fetch(`${BASE}/api/dropbox/disconnect`, { method: 'DELETE', headers: authHeaders() });
+    return handleJson(res, 'Failed to disconnect Dropbox');
   },
 
   // Print batch (Dropbox)

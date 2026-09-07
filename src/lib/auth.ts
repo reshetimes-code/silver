@@ -9,7 +9,7 @@ import { prisma } from './db';
 // value. (Checked lazily, not at module load, so `next build`'s static
 // route analysis — which imports this file without a real request — still
 // succeeds even before the env var is configured in that environment.)
-function getJwtSecret(): string {
+export function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
     throw new Error('JWT_SECRET environment variable is not set.');
