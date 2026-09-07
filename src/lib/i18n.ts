@@ -62,6 +62,7 @@ export const translations = {
 
     // WhatsApp
     sendToWhatsApp: 'Send to WhatsApp',
+    sendToOtherWhatsApp: 'Send to Another WhatsApp',
     sharePhoto: 'Share Photo',
 
     // Common
@@ -130,6 +131,7 @@ export const translations = {
 
     // WhatsApp
     sendToWhatsApp: 'שלח לוואטסאפ',
+    sendToOtherWhatsApp: 'שלח לוואטסאפ למספר אחר',
     sharePhoto: 'שתף תמונה',
 
     // Common
