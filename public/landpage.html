@@ -413,8 +413,13 @@
     color:var(--ink); font-family:inherit; font-size:var(--fs-base); padding:1.35rem 1rem .55rem;
     transition:border-color .25s ease, box-shadow .25s ease;
   }
+  .field input, .field select{ height:3.35rem; }
   .field select{ appearance:none; -webkit-appearance:none; padding-inline-end:2.3rem; background-position:right 1rem center; background-repeat:no-repeat;
     background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'><path d='M1 1l6 6 6-6' stroke='%23b4a9cf' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>"); }
+  /* iOS Safari gives input[type=date] its own intrinsic control height that
+     ignores the padding above, making it taller than the other fields —
+     force it in line with everything else in the row. */
+  .field input[type="date"]{ -webkit-appearance:none; appearance:none; padding-top:1.1rem; }
   .field textarea{ min-height:90px; resize:vertical; padding-top:1.4rem; }
   .field label{
     position:absolute; inset-inline-start:1rem; top:1.05rem; color:var(--muted-2); font-size:var(--fs-base); pointer-events:none;
