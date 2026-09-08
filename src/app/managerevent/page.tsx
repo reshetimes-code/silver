@@ -14,8 +14,9 @@ const content = {
   en: {
     hero: {
       title: 'The Photobooth Platform That Books Your Next Event',
-      subtitle:
-        "Run a stunning, fully-branded photo booth at every event — while the system quietly turns tonight's guests into tomorrow's bookings.",
+      subtitlePre: "Run a stunning, fully-branded photo booth at every event — while the system quietly turns tonight's guests into tomorrow's ",
+      subtitleHighlight: 'leads',
+      subtitlePost: '.',
     },
     features: [
       { icon: '📸', title: 'Instant Capture', desc: 'Guests take their photo straight from their own phone camera — no app to download, no waiting in line. They just scan the event QR code and go.' },
@@ -78,7 +79,9 @@ const content = {
   he: {
     hero: {
       title: 'מערכת הפוטובוט\' שסוגרת לכם את האירוע הבא',
-      subtitle: 'מפעילים עמדת פוטובוט\' מרשימה ומותאמת אישית בכל אירוע — והמערכת דואגת שהאורחים של הערב יהפכו ללידים של מחר.',
+      subtitlePre: 'מפעילים עמדת פוטובוט\' מרשימה ומותאמת אישית בכל אירוע — והמערכת דואגת שהאורחים של הערב יהפכו ל',
+      subtitleHighlight: 'לידים חדשים',
+      subtitlePost: ' של מחר.',
     },
     features: [
       { icon: '📸', title: 'צילום מיידי', desc: 'האורחים מצלמים ישירות מהמצלמה של הטלפון שלהם — בלי להוריד אפליקציה ובלי לעמוד בתור. הם סורקים את קוד ה-QR של האירוע וזהו.' },
@@ -326,9 +329,11 @@ export default function LandingPage() {
         </motion.h1>
         <motion.p
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }}
-          className="text-base sm:text-lg text-white/50 max-w-xl mx-auto leading-relaxed"
+          className="text-lg sm:text-xl font-medium text-white/80 max-w-xl mx-auto leading-relaxed"
         >
-          {c.hero.subtitle}
+          {c.hero.subtitlePre}
+          <span className="font-black" style={{ color: '#D4AF37' }}>{c.hero.subtitleHighlight}</span>
+          {c.hero.subtitlePost}
         </motion.p>
 
         <motion.div
