@@ -72,7 +72,10 @@ export default function GatewayPage() {
       <LanguageToggle />
 
       <motion.div {...fadeUp} transition={{ duration: 0.6 }} className="relative z-10 mb-8 flex items-center justify-center">
-        <div className="absolute inset-0 flex items-center justify-center">
+        {/* logo_transperent.png isn't centered on its own camera-lens circle (extra
+            space below for the "BOOTH" wordmark), so nudge the globe up/left to
+            align its ring with the lens instead of the image's raw canvas center. */}
+        <div className="absolute inset-0 flex items-center justify-center -translate-x-[3px] -translate-y-[19px] sm:-translate-y-[23px]">
           <SpinningGlobe size={230} />
         </div>
         <div className="relative">
