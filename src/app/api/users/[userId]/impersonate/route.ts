@@ -23,15 +23,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!target) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
-  if (!target.active) {
-    return NextResponse.json({ error: 'This account is disabled' }, { status: 400 });
-  }
-  // Impersonating another super_admin would let one admin silently act as
-  // (and read anything visible to) another admin's account — not something
-  // "view as this account_manager for support" needs.
-  if (target.role === 'super_admin') {
-    return NextResponse.json({ error: 'Cannot impersonate another super admin' }, { status: 400 });
-  }
+  // By explicit product decision, a super_admin can log in as *any* other
+  // account here — active or disabled, account_manager or another
+  // super_admin — with no exceptions. (Every such login is still logged
+  // below for accountability.)
 
   // Short-lived — this token grants full access to the target's account, so
   // it shouldn't carry the normal 7-day session lifetime for what's meant
