@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Swal from '@/lib/swal';
 import { useStore } from '@/lib/store';
@@ -954,17 +954,10 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
   const [errors, setErrors] = useState<{ name?: boolean; email?: boolean }>({});
   const loader = useLoader();
 
-  // Actions dropdown for the mobile card layout — only one open at a time.
+  // Which user's actions accordion is expanded on the mobile layout — only
+  // one open at a time (tapping a row toggles it; tapping another row
+  // switches to that one).
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!openMenuId) return;
-    const closeOnOutsideClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpenMenuId(null);
-    };
-    document.addEventListener('mousedown', closeOnOutsideClick);
-    return () => document.removeEventListener('mousedown', closeOnOutsideClick);
-  }, [openMenuId]);
 
   const loadUsers = () => {
     api.getUsers().then((data: UserData[]) => { setUsers(data); setLoading(false); }).catch((err) => {
@@ -1118,82 +1111,78 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
         )}
       </AnimatePresence>
 
-      {/* Mobile: card list with a per-user actions dropdown instead of a
-          side-scrolling 8-column table — nothing to scroll to discover. */}
+      {/* Mobile: accordion — tap a row to expand its actions inline below
+          it (pushes the rest of the list down), instead of a floating menu
+          that can end up positioned oddly or clipped near screen edges. */}
       <div className="sm:hidden glass-card overflow-hidden divide-y divide-white/5" dir={he ? 'rtl' : 'ltr'}>
-        {users.map((user, index) => {
+        {users.map((user) => {
           const isSelf = user.id === currentUserId;
-          const menuOpen = openMenuId === user.id;
-          // The menu opens downward by default, which clips off-screen for
-          // rows near the bottom of the list (worst case: the very last
-          // row, with nothing below it at all). Flip it upward for the
-          // last couple of rows instead of measuring viewport space at
-          // runtime — simple and correct for how this list is laid out.
-          const openUpward = index >= users.length - 2;
+          const rowOpen = openMenuId === user.id;
           return (
-            <div key={user.id} className="p-3 flex items-center gap-2">
-              <div className="min-w-0 flex-1">
-                <div className="text-white font-bold text-sm truncate">
-                  {user.name}{isSelf && <span className="text-white/30 font-normal"> ({he ? 'אתה' : 'you'})</span>}
+            <div key={user.id}>
+              <button
+                onClick={() => setOpenMenuId(rowOpen ? null : user.id)}
+                className="w-full p-3 flex items-center gap-2 text-start"
+                aria-expanded={rowOpen}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="text-white font-bold text-sm truncate">
+                    {user.name}{isSelf && <span className="text-white/30 font-normal"> ({he ? 'אתה' : 'you'})</span>}
+                  </div>
+                  <div className="text-white/50 text-xs truncate" dir="ltr">{user.email}</div>
+                  <div className="flex items-center flex-wrap gap-1.5 mt-1.5">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${user.role === 'super_admin' ? 'bg-primary/20 text-[#D4AF37]' : 'bg-white/8 text-white/50'}`}>
+                      {user.role === 'super_admin' ? (he ? 'מנהל אתר' : 'Super Admin') : (he ? 'מנהל חשבון' : 'Account Mgr')}
+                    </span>
+                    <span className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full ${user.active ? 'text-green-400' : 'text-red-400'}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${user.active ? 'bg-green-500' : 'bg-red-500'}`} />
+                      {user.active ? (he ? 'פעיל' : 'Active') : (he ? 'מושבת' : 'Disabled')}
+                    </span>
+                    <span className="text-[10px] text-white/30">{he ? 'אירועים' : 'events'}: {user._count.events}</span>
+                  </div>
                 </div>
-                <div className="text-white/50 text-xs truncate" dir="ltr">{user.email}</div>
-                <div className="flex items-center flex-wrap gap-1.5 mt-1.5">
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${user.role === 'super_admin' ? 'bg-primary/20 text-[#D4AF37]' : 'bg-white/8 text-white/50'}`}>
-                    {user.role === 'super_admin' ? (he ? 'מנהל אתר' : 'Super Admin') : (he ? 'מנהל חשבון' : 'Account Mgr')}
-                  </span>
-                  <span className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full ${user.active ? 'text-green-400' : 'text-red-400'}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${user.active ? 'bg-green-500' : 'bg-red-500'}`} />
-                    {user.active ? (he ? 'פעיל' : 'Active') : (he ? 'מושבת' : 'Disabled')}
-                  </span>
-                  <span className="text-[10px] text-white/30">{he ? 'אירועים' : 'events'}: {user._count.events}</span>
-                </div>
-              </div>
+                <motion.span animate={{ rotate: rowOpen ? 180 : 0 }} className="shrink-0 text-white/40 text-sm">▾</motion.span>
+              </button>
 
-              <div className="relative shrink-0" ref={menuOpen ? menuRef : undefined}>
-                <button onClick={() => setOpenMenuId(menuOpen ? null : user.id)}
-                  aria-label={he ? 'פעולות' : 'Actions'}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/8 text-white/60 hover:bg-white/15 hover:text-white text-lg leading-none">
-                  ⋮
-                </button>
-                <AnimatePresence>
-                  {menuOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: openUpward ? 4 : -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: openUpward ? 4 : -4 }}
-                      className={`absolute z-20 ${openUpward ? 'bottom-full mb-1' : 'top-full mt-1'} min-w-[10rem] rounded-xl overflow-hidden border border-white/10 shadow-xl`}
-                      style={{ background: '#141414', insetInlineEnd: 0 }}
-                    >
+              <AnimatePresence initial={false}>
+                {rowOpen && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="px-3 pb-3 flex flex-wrap gap-2">
                       <button onClick={() => { startEdit(user); setOpenMenuId(null); }}
-                        className="block w-full text-start px-4 py-2.5 text-sm text-blue-400 hover:bg-white/5">
+                        className="px-3 py-2 rounded-lg text-xs font-bold bg-blue-500/15 text-blue-400">
                         {he ? '✏️ ערוך' : '✏️ Edit'}
                       </button>
                       {!isSelf && (
                         <button onClick={() => { setOpenMenuId(null); handleLoginAs(user); }}
-                          className="block w-full text-start px-4 py-2.5 text-sm text-purple-400 hover:bg-white/5">
+                          className="px-3 py-2 rounded-lg text-xs font-bold bg-purple-500/15 text-purple-400">
                           {he ? '👤 היכנס לחשבון' : '👤 Log in as'}
                         </button>
                       )}
                       {!isSelf && (
                         <button onClick={() => { toggleRole(user); setOpenMenuId(null); }}
-                          className="block w-full text-start px-4 py-2.5 text-sm text-white/70 hover:bg-white/5">
+                          className="px-3 py-2 rounded-lg text-xs font-bold bg-white/8 text-white/70">
                           {he ? '🔁 החלף תפקיד' : '🔁 Switch role'}
                         </button>
                       )}
                       {!isSelf && (
                         <button onClick={() => { toggleActive(user); setOpenMenuId(null); }}
-                          className="block w-full text-start px-4 py-2.5 text-sm text-white/70 hover:bg-white/5">
+                          className="px-3 py-2 rounded-lg text-xs font-bold bg-white/8 text-white/70">
                           {user.active ? (he ? '⏸️ השבת' : '⏸️ Disable') : (he ? '▶️ הפעל' : '▶️ Activate')}
                         </button>
                       )}
                       {!isSelf && (
                         <button onClick={() => { setOpenMenuId(null); handleDelete(user); }}
-                          className="block w-full text-start px-4 py-2.5 text-sm text-red-400 hover:bg-white/5">
+                          className="px-3 py-2 rounded-lg text-xs font-bold bg-red-500/15 text-red-400">
                           {he ? '🗑️ מחק' : '🗑️ Delete'}
                         </button>
                       )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           );
         })}

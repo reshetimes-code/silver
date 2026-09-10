@@ -42,7 +42,18 @@ export default function ImpersonationBanner() {
   const handleReturn = () => {
     if (api.returnToAdmin()) {
       window.location.href = '/admin';
+      return;
     }
+    // The stashed admin session is missing (cleared storage, an old/odd
+    // state, etc.) — previously this just did nothing, which looked like a
+    // dead button. There's no session left to safely return to, so send
+    // them to log back in rather than leave them stuck on someone else's
+    // account with no way out.
+    localStorage.removeItem('auth-token');
+    localStorage.removeItem('auth-user');
+    localStorage.removeItem('impersonator-token');
+    localStorage.removeItem('impersonator-user');
+    window.location.href = '/login';
   };
 
   return (
