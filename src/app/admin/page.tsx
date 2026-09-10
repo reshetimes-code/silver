@@ -1124,9 +1124,15 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
       {/* Mobile: card list with a per-user actions dropdown instead of a
           side-scrolling 8-column table — nothing to scroll to discover. */}
       <div className="sm:hidden glass-card overflow-hidden divide-y divide-white/5" dir={he ? 'rtl' : 'ltr'}>
-        {users.map((user) => {
+        {users.map((user, index) => {
           const isSelf = user.id === currentUserId;
           const menuOpen = openMenuId === user.id;
+          // The menu opens downward by default, which clips off-screen for
+          // rows near the bottom of the list (worst case: the very last
+          // row, with nothing below it at all). Flip it upward for the
+          // last couple of rows instead of measuring viewport space at
+          // runtime — simple and correct for how this list is laid out.
+          const openUpward = index >= users.length - 2;
           return (
             <div key={user.id} className="p-3 flex items-center gap-2">
               <div className="min-w-0 flex-1">
@@ -1155,8 +1161,8 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
                 <AnimatePresence>
                   {menuOpen && (
                     <motion.div
-                      initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
-                      className="absolute z-20 top-full mt-1 min-w-[10rem] rounded-xl overflow-hidden border border-white/10 shadow-xl"
+                      initial={{ opacity: 0, y: openUpward ? 4 : -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: openUpward ? 4 : -4 }}
+                      className={`absolute z-20 ${openUpward ? 'bottom-full mb-1' : 'top-full mt-1'} min-w-[10rem] rounded-xl overflow-hidden border border-white/10 shadow-xl`}
                       style={{ background: '#141414', insetInlineEnd: 0 }}
                     >
                       <button onClick={() => { startEdit(user); setOpenMenuId(null); }}
