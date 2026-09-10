@@ -139,6 +139,17 @@ export default function AdminPage() {
     }
   }, []);
 
+  // Default landing tab for super admins is Users — but only once we know
+  // the role (currentUser loads async via AdminAuth below) and only if the
+  // URL didn't already request a specific tab, so a direct link/refresh
+  // into e.g. ?tab=events still lands where it says.
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    const hadExplicitTab = new URLSearchParams(window.location.search).has('tab');
+    if (!hadExplicitTab) setTab('users');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuperAdmin]);
+
   if (!hydrated) return null;
 
   const tabs: { id: Tab; label: string; icon: string }[] = [
@@ -1026,24 +1037,10 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
   };
 
   const handleLoginAs = async (user: UserData) => {
-    // The impersonate API call authenticates as whichever account is
-    // currently active. If an impersonation session is already open, that's
-    // the *impersonated* user's (non-admin) token — a second "log in as"
-    // click would use that token and get a confusing generic 403 instead of
-    // the real reason. Catch it here with a clear message and route back to
-    // admin first, rather than letting the request fail unexplained.
-    if (api.isImpersonating()) {
-      await Swal.fire({
-        icon: 'info',
-        title: he ? 'כבר בתוך התחזות למשתמש אחר' : 'Already impersonating another user',
-        text: he
-          ? 'קודם תחזור לניהול (הכפתור "חזרה לניהול" למעלה), ורק אז תוכל להיכנס לחשבון של משתמש נוסף.'
-          : 'Return to admin first (the "Return to admin" button at the top), then you can log in as a different user.',
-        confirmButtonColor: '#D4AF37', background: '#0a0a0a', color: '#fff',
-      });
-      return;
-    }
-
+    // loginAsUser() authenticates with the real admin token even if we're
+    // already impersonating someone else (see src/lib/api.ts), so this can
+    // jump directly from one impersonated user to another with no need to
+    // return to admin in between.
     const result = await Swal.fire({
       icon: 'question',
       title: he ? `להיכנס לחשבון של ${user.name}?` : `Log in as ${user.name}?`,

@@ -117,13 +117,19 @@ export const api = {
 
   // "Login as" — a super admin borrows another user's session to see the
   // app exactly as they do. The admin's own session is stashed under
-  // impersonator-* so returnToAdmin() can restore it; loginAsUser() refuses
-  // to overwrite an already-stashed session so switching between two
-  // impersonated users can't lose the original admin session.
+  // impersonator-* so returnToAdmin() can restore it. If a session is
+  // already stashed (i.e. we're already impersonating someone), this call
+  // authenticates with *that* original admin token rather than whichever
+  // (possibly non-admin) token is currently active — otherwise jumping
+  // directly from user A to user B while already impersonating A would
+  // authenticate as A, not as the real admin, and get rejected server-side.
   async loginAsUser(id: string) {
+    const activeToken = typeof window !== 'undefined' ? localStorage.getItem('auth-token') : null;
+    const stashedAdminToken = typeof window !== 'undefined' ? localStorage.getItem('impersonator-token') : null;
+    const authToken = stashedAdminToken || activeToken;
     const res = await fetch(`${BASE}/api/users/${id}/impersonate`, {
       method: 'POST',
-      headers: authHeaders(),
+      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
     });
     const data = await handleJson(res, 'Failed to log in as user');
     if (typeof window !== 'undefined') {
