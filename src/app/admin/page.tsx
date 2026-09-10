@@ -1052,7 +1052,13 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
   // Straight to this user's Dropbox connection screen — used when helping a
   // new client connect their Dropbox account, instead of impersonating them
   // and then hunting through the hamburger menu on their dashboard for it.
+  // For your own row there's nothing to impersonate — just go straight
+  // there with your own session.
   const handleLoginAsDropbox = async (user: UserData) => {
+    if (user.id === currentUserId) {
+      window.location.href = '/dashboard/storage';
+      return;
+    }
     await withErrorAlert(async () => {
       await api.loginAsUser(user.id);
       window.location.href = '/dashboard/storage';
@@ -1165,37 +1171,27 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
                         className="px-3 py-2 rounded-lg text-xs font-bold bg-blue-500/15 text-blue-400">
                         {he ? '✏️ ערוך' : '✏️ Edit'}
                       </button>
-                      {!isSelf && (
-                        <button onClick={() => { setOpenMenuId(null); handleLoginAs(user); }}
-                          className="px-3 py-2 rounded-lg text-xs font-bold bg-purple-500/15 text-purple-400">
-                          {he ? '👤 היכנס לחשבון' : '👤 Log in as'}
-                        </button>
-                      )}
-                      {!isSelf && (
-                        <button onClick={() => { setOpenMenuId(null); handleLoginAsDropbox(user); }}
-                          title={he ? 'עוזר ללקוח לחבר Dropbox' : "Help this client connect Dropbox"}
-                          className="px-3 py-2 rounded-lg text-xs font-bold bg-sky-500/15 text-sky-400">
-                          {he ? '📦 חיבור Dropbox' : '📦 Connect Dropbox'}
-                        </button>
-                      )}
-                      {!isSelf && (
-                        <button onClick={() => { toggleRole(user); setOpenMenuId(null); }}
-                          className="px-3 py-2 rounded-lg text-xs font-bold bg-white/8 text-white/70">
-                          {he ? '🔁 החלף תפקיד' : '🔁 Switch role'}
-                        </button>
-                      )}
-                      {!isSelf && (
-                        <button onClick={() => { toggleActive(user); setOpenMenuId(null); }}
-                          className="px-3 py-2 rounded-lg text-xs font-bold bg-white/8 text-white/70">
-                          {user.active ? (he ? '⏸️ השבת' : '⏸️ Disable') : (he ? '▶️ הפעל' : '▶️ Activate')}
-                        </button>
-                      )}
-                      {!isSelf && (
-                        <button onClick={() => { setOpenMenuId(null); handleDelete(user); }}
-                          className="px-3 py-2 rounded-lg text-xs font-bold bg-red-500/15 text-red-400">
-                          {he ? '🗑️ מחק' : '🗑️ Delete'}
-                        </button>
-                      )}
+                      <button onClick={() => { setOpenMenuId(null); handleLoginAs(user); }}
+                        className="px-3 py-2 rounded-lg text-xs font-bold bg-purple-500/15 text-purple-400">
+                        {he ? '👤 היכנס לחשבון' : '👤 Log in as'}
+                      </button>
+                      <button onClick={() => { setOpenMenuId(null); handleLoginAsDropbox(user); }}
+                        title={he ? 'חיבור Dropbox' : 'Connect Dropbox'}
+                        className="px-3 py-2 rounded-lg text-xs font-bold bg-sky-500/15 text-sky-400">
+                        {he ? '📦 חיבור Dropbox' : '📦 Connect Dropbox'}
+                      </button>
+                      <button onClick={() => { toggleRole(user); setOpenMenuId(null); }}
+                        className="px-3 py-2 rounded-lg text-xs font-bold bg-white/8 text-white/70">
+                        {he ? '🔁 החלף תפקיד' : '🔁 Switch role'}
+                      </button>
+                      <button onClick={() => { toggleActive(user); setOpenMenuId(null); }}
+                        className="px-3 py-2 rounded-lg text-xs font-bold bg-white/8 text-white/70">
+                        {user.active ? (he ? '⏸️ השבת' : '⏸️ Disable') : (he ? '▶️ הפעל' : '▶️ Activate')}
+                      </button>
+                      <button onClick={() => { setOpenMenuId(null); handleDelete(user); }}
+                        className="px-3 py-2 rounded-lg text-xs font-bold bg-red-500/15 text-red-400">
+                        {he ? '🗑️ מחק' : '🗑️ Delete'}
+                      </button>
                     </div>
                   </motion.div>
                 )}
@@ -1237,16 +1233,16 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
                     <td className="px-3 py-3 text-white/60 whitespace-nowrap" dir="ltr">{user.email}</td>
                     <td className="px-3 py-3 text-white/60 whitespace-nowrap" dir="ltr">{user.phone || '—'}</td>
                     <td className="px-3 py-3 whitespace-nowrap">
-                      <button onClick={() => toggleRole(user)} disabled={isSelf}
-                        className={`text-xs px-2 py-0.5 rounded-full font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                      <button onClick={() => toggleRole(user)}
+                        className={`text-xs px-2 py-0.5 rounded-full font-bold transition-colors ${
                           user.role === 'super_admin' ? 'bg-primary/20 text-[#D4AF37] hover:bg-primary/30' : 'bg-white/8 text-white/50 hover:bg-white/15'
-                        }`} title={isSelf ? '' : (he ? 'לחץ להחלפת תפקיד' : 'Click to switch role')}>
+                        }`} title={he ? 'לחץ להחלפת תפקיד' : 'Click to switch role'}>
                         {user.role === 'super_admin' ? (he ? 'מנהל אתר' : 'Super Admin') : (he ? 'מנהל חשבון' : 'Account Mgr')}
                       </button>
                     </td>
                     <td className="px-3 py-3 whitespace-nowrap">
-                      <button onClick={() => toggleActive(user)} disabled={isSelf}
-                        className={`flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full disabled:opacity-50 disabled:cursor-not-allowed ${user.active ? 'text-green-400 hover:bg-green-500/10' : 'text-red-400 hover:bg-red-500/10'}`}>
+                      <button onClick={() => toggleActive(user)}
+                        className={`flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full ${user.active ? 'text-green-400 hover:bg-green-500/10' : 'text-red-400 hover:bg-red-500/10'}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${user.active ? 'bg-green-500' : 'bg-red-500'}`} />
                         {user.active ? (he ? 'פעיל' : 'Active') : (he ? 'מושבת' : 'Disabled')}
                       </button>
@@ -1259,24 +1255,18 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
                           className="px-2 py-1 rounded-lg text-xs font-bold bg-blue-500/15 text-blue-400 hover:bg-blue-500/25">
                           {he ? 'ערוך' : 'Edit'}
                         </button>
-                        {!isSelf && (
-                          <button onClick={() => handleLoginAs(user)} title={he ? 'היכנס לחשבון' : 'Log in as'}
-                            className="px-2 py-1 rounded-lg text-xs font-bold bg-purple-500/15 text-purple-400 hover:bg-purple-500/25">
-                            {he ? 'כניסה' : 'Login as'}
-                          </button>
-                        )}
-                        {!isSelf && (
-                          <button onClick={() => handleLoginAsDropbox(user)} title={he ? 'עוזר ללקוח לחבר Dropbox' : 'Help this client connect Dropbox'}
-                            className="px-2 py-1 rounded-lg text-xs font-bold bg-sky-500/15 text-sky-400 hover:bg-sky-500/25">
-                            {he ? '📦 Dropbox' : '📦 Dropbox'}
-                          </button>
-                        )}
-                        {!isSelf && (
-                          <button onClick={() => handleDelete(user)} title={he ? 'מחק' : 'Delete'}
-                            className="px-2 py-1 rounded-lg text-xs font-bold bg-red-500/15 text-red-400 hover:bg-red-500/25">
-                            🗑️
-                          </button>
-                        )}
+                        <button onClick={() => handleLoginAs(user)} title={he ? 'היכנס לחשבון' : 'Log in as'}
+                          className="px-2 py-1 rounded-lg text-xs font-bold bg-purple-500/15 text-purple-400 hover:bg-purple-500/25">
+                          {he ? 'כניסה' : 'Login as'}
+                        </button>
+                        <button onClick={() => handleLoginAsDropbox(user)} title={he ? 'חיבור Dropbox' : 'Connect Dropbox'}
+                          className="px-2 py-1 rounded-lg text-xs font-bold bg-sky-500/15 text-sky-400 hover:bg-sky-500/25">
+                          {he ? '📦 Dropbox' : '📦 Dropbox'}
+                        </button>
+                        <button onClick={() => handleDelete(user)} title={he ? 'מחק' : 'Delete'}
+                          className="px-2 py-1 rounded-lg text-xs font-bold bg-red-500/15 text-red-400 hover:bg-red-500/25">
+                          🗑️
+                        </button>
                       </div>
                     </td>
                   </tr>
