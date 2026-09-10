@@ -31,6 +31,12 @@ export interface JWTPayload {
   userId: string;
   email: string;
   role: UserRole;
+  // Set only on tokens minted via /api/users/[userId]/impersonate. Lets
+  // getUserFromRequest tell "this admin is looking through a disabled
+  // account's eyes" apart from "this disabled account is trying to log
+  // itself in" — the same active:false row, but only one of those should
+  // ever be allowed through.
+  impersonated?: boolean;
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -41,12 +47,14 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash);
 }
 
-export function createToken(user: { id: string; email: string; role: string }, expiresIn: string = TOKEN_EXPIRY): string {
-  return jwt.sign(
-    { userId: user.id, email: user.email, role: user.role } as JWTPayload,
-    getJwtSecret(),
-    { expiresIn, algorithm: 'HS256' } as jwt.SignOptions
-  );
+export function createToken(
+  user: { id: string; email: string; role: string },
+  expiresIn: string = TOKEN_EXPIRY,
+  opts: { impersonated?: boolean } = {}
+): string {
+  const payload: JWTPayload = { userId: user.id, email: user.email, role: user.role as UserRole };
+  if (opts.impersonated) payload.impersonated = true;
+  return jwt.sign(payload, getJwtSecret(), { expiresIn, algorithm: 'HS256' } as jwt.SignOptions);
 }
 
 export function verifyToken(token: string): JWTPayload | null {
@@ -76,7 +84,12 @@ export async function getUserFromRequest(request: Request): Promise<AuthUser | n
   if (!payload) return null;
 
   const user = await prisma.user.findUnique({ where: { id: payload.userId } });
-  if (!user || !user.active) return null;
+  if (!user) return null;
+  // A disabled account can never authenticate on its own (normal login,
+  // Google sign-in, etc.) — but a super admin who deliberately impersonated
+  // it should still be able to look around, not get silently logged out on
+  // their very next request.
+  if (!user.active && !payload.impersonated) return null;
 
   return {
     id: user.id,

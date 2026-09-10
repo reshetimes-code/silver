@@ -31,7 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // Short-lived — this token grants full access to the target's account, so
   // it shouldn't carry the normal 7-day session lifetime for what's meant
   // to be a brief support session.
-  const token = createToken(target, '2h');
+  const token = createToken(target, '2h', { impersonated: true });
   console.log(`[impersonate] super_admin ${currentUser!.email} (${currentUser!.id}) started impersonating ${target.email} (${target.id})`);
 
   return NextResponse.json({
