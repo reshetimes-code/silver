@@ -615,6 +615,26 @@ input[type="number"] {
   }
 }
 
+/* ===== MOBILE TYPE SCALE =====
+   Text across the app was sized for desktop and read too small/cramped on
+   phones. Bump every Tailwind text-size utility up a notch below the `sm`
+   breakpoint — this is a plain (non-@layer) rule, so it overrides Tailwind's
+   own utility layer regardless of source order, and it only touches font
+   sizes (and their matching line-heights), not spacing/padding/width
+   utilities, so it can't shift layouts the way scaling the root font-size
+   would. */
+@media (max-width: 640px) {
+  .text-\[10px\] { font-size: 11px !important; }
+  .text-xs { font-size: 0.8125rem !important; line-height: 1.15rem !important; }
+  .text-sm { font-size: 0.9375rem !important; line-height: 1.4rem !important; }
+  .text-base { font-size: 1.0625rem !important; line-height: 1.6rem !important; }
+  .text-lg { font-size: 1.1875rem !important; line-height: 1.7rem !important; }
+  .text-xl { font-size: 1.3125rem !important; line-height: 1.8rem !important; }
+  .text-2xl { font-size: 1.625rem !important; line-height: 2.05rem !important; }
+  .text-3xl { font-size: 2rem !important; line-height: 2.3rem !important; }
+  .text-4xl { font-size: 2.375rem !important; line-height: 2.5rem !important; }
+}
+
 /* ===== ACCESSIBILITY ===== */
 .high-contrast {
   filter: contrast(1.4);
