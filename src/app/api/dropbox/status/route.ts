@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
+import { prisma, ensureDropboxAccountTable } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 
 // Never returns the stored refresh token — only display/status fields.
@@ -9,6 +9,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
+  await ensureDropboxAccountTable();
   const account = await prisma.dropboxAccount.findUnique({
     where: { userId: user.id },
     select: { accountEmail: true, accountName: true, rootFolderPath: true },

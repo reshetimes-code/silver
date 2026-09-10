@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
+import { prisma, ensureDropboxAccountTable } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 
 // PATCH /api/dropbox/select-folder { path } — persists the manager's chosen
@@ -15,6 +15,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'Folder path required' }, { status: 400 });
   }
 
+  await ensureDropboxAccountTable();
   const existing = await prisma.dropboxAccount.findUnique({ where: { userId: user.id } });
   if (!existing) {
     return NextResponse.json({ error: 'Dropbox not connected' }, { status: 409 });

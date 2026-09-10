@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
+import { prisma, ensureDropboxAccountTable } from '@/lib/db';
 import { getUserFromRequest, isSuperAdmin, hashPassword } from '@/lib/auth';
 
 // GET /api/users — list all users (super_admin only)
@@ -100,6 +100,7 @@ export async function DELETE(request: Request) {
 
   // Don't take the user's events/leads/photos down with them — just release
   // the ownership so they fall back to "unassigned" instead of vanishing.
+  await ensureDropboxAccountTable();
   await prisma.$transaction([
     prisma.event.updateMany({ where: { ownerId: id }, data: { ownerId: null } }),
     prisma.lead.updateMany({ where: { ownerId: id }, data: { ownerId: null } }),

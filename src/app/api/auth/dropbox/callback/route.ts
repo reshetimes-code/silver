@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import * as jwt from 'jsonwebtoken';
-import { prisma } from '@/lib/db';
+import { prisma, ensureDropboxAccountTable } from '@/lib/db';
 import { getJwtSecret } from '@/lib/auth';
 import { exchangeCodeForToken, getCurrentAccount } from '@/lib/dropbox-oauth';
 import { getBaseUrl } from '@/lib/url';
@@ -25,6 +25,7 @@ export async function GET(request: Request) {
   }
 
   try {
+    await ensureDropboxAccountTable();
     const redirectUri = `${baseUrl}/api/auth/dropbox/callback`;
     const { accessToken, refreshToken } = await exchangeCodeForToken(code, redirectUri);
     const account = await getCurrentAccount(accessToken);

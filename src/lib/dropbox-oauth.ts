@@ -1,4 +1,4 @@
-import { prisma } from './db';
+import { prisma, ensureDropboxAccountTable } from './db';
 
 /**
  * Per-manager Dropbox OAuth: lets each account manager connect *their own*
@@ -124,21 +124,32 @@ const userTokenCache = new Map<string, { accessToken: string; expiresAt: number 
  * Resolves the access token to use for a given account manager's own
  * Dropbox connection. Returns null if that user hasn't connected one yet —
  * callers should fall back to the shared env-configured account in that case.
+ *
+ * Never throws: callers in src/lib/dropbox.ts treat null as "fall back to
+ * the shared account", so any lookup/refresh failure here (DB hiccup,
+ * revoked token, etc.) must degrade to that same fallback rather than
+ * blowing up event creation or photo uploads for everyone.
  */
 export async function getAccessTokenForUser(userId: string | null | undefined): Promise<{ accessToken: string; rootFolderPath: string | null } | null> {
   if (!userId) return null;
 
-  const account = await prisma.dropboxAccount.findUnique({ where: { userId } });
-  if (!account) return null;
+  try {
+    await ensureDropboxAccountTable();
+    const account = await prisma.dropboxAccount.findUnique({ where: { userId } });
+    if (!account) return null;
 
-  const cached = userTokenCache.get(userId);
-  if (cached && Date.now() < cached.expiresAt) {
-    return { accessToken: cached.accessToken, rootFolderPath: account.rootFolderPath };
+    const cached = userTokenCache.get(userId);
+    if (cached && Date.now() < cached.expiresAt) {
+      return { accessToken: cached.accessToken, rootFolderPath: account.rootFolderPath };
+    }
+
+    const { accessToken, expiresIn } = await refreshDropboxToken(account.refreshToken);
+    userTokenCache.set(userId, { accessToken, expiresAt: Date.now() + (expiresIn - 300) * 1000 });
+    return { accessToken, rootFolderPath: account.rootFolderPath };
+  } catch (error) {
+    console.error(`Failed to resolve Dropbox access token for user ${userId}:`, error);
+    return null;
   }
-
-  const { accessToken, expiresIn } = await refreshDropboxToken(account.refreshToken);
-  userTokenCache.set(userId, { accessToken, expiresAt: Date.now() + (expiresIn - 300) * 1000 });
-  return { accessToken, rootFolderPath: account.rootFolderPath };
 }
 
 export interface DropboxFolderEntry {
