@@ -168,6 +168,19 @@ export interface DropboxFolderEntry {
   path: string;
 }
 
+// Thrown when Dropbox reports the requested path doesn't exist in the
+// *currently connected* account — most commonly because the browser is
+// still trying to browse a path (e.g. left over from before switching
+// accounts) that only ever existed in a previously connected account.
+// Callers can catch this specifically to fall back to root instead of
+// surfacing it as a generic connection error.
+export class DropboxPathNotFoundError extends Error {
+  constructor(path: string) {
+    super(`Dropbox path not found in the connected account: ${path || '(root)'}`);
+    this.name = 'DropboxPathNotFoundError';
+  }
+}
+
 /** Lists only the subfolders (not files) directly under `path` ("" = root). */
 export async function listDropboxFolder(accessToken: string, path: string): Promise<DropboxFolderEntry[]> {
   const res = await fetch('https://api.dropboxapi.com/2/files/list_folder', {
@@ -175,7 +188,13 @@ export async function listDropboxFolder(accessToken: string, path: string): Prom
     headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
     body: asciiSafeJson({ path, limit: 500 }),
   });
-  if (!res.ok) throw new Error(`Dropbox list_folder failed: ${await res.text()}`);
+  if (!res.ok) {
+    const bodyText = await res.text();
+    if (bodyText.includes('path/not_found') || bodyText.includes('path_lookup/not_found')) {
+      throw new DropboxPathNotFoundError(path);
+    }
+    throw new Error(`Dropbox list_folder failed: ${bodyText}`);
+  }
   const data = await res.json();
   return (data.entries as Array<{ '.tag': string; name: string; path_display: string }>)
     .filter((e) => e['.tag'] === 'folder')

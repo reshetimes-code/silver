@@ -111,6 +111,16 @@ export default function StoragePage() {
       setBrowsing(false);
     }).catch((err) => {
       setBrowsing(false);
+      // Most often this means the browser was still pointed at a folder
+      // path left over from browsing a *previously* connected Dropbox
+      // account (e.g. after "Change account") — that path simply doesn't
+      // exist in the newly connected one. Fall back to root instead of
+      // showing a scary "check your connection" error for something that
+      // isn't a connection problem at all.
+      if (err instanceof Error && err.message === 'path_not_found' && path !== '') {
+        setCurrentPath('');
+        return;
+      }
       showActionError(err);
     });
   }, []);
