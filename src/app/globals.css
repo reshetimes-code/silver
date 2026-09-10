@@ -45,6 +45,13 @@ body.impersonating {
 
 html {
   height: 100%;
+  /* iOS Safari can still let a touch-drag pan the page horizontally even
+     though body already has overflow-x: hidden below — that rule alone
+     doesn't stop the outer <html> box from being draggable if any
+     descendant is even slightly wider than the viewport. Setting it here
+     too, plus a hard width cap, is the standard fix for that gap. */
+  overflow-x: hidden;
+  width: 100%;
 }
 
 body {
@@ -52,6 +59,7 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   overflow-x: hidden;
+  max-width: 100vw;
   overflow-y: auto;
   overscroll-behavior: none;
   -webkit-overscroll-behavior: none;
