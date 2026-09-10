@@ -41,17 +41,21 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash);
 }
 
-export function createToken(user: { id: string; email: string; role: string }): string {
+export function createToken(user: { id: string; email: string; role: string }, expiresIn: string = TOKEN_EXPIRY): string {
   return jwt.sign(
     { userId: user.id, email: user.email, role: user.role } as JWTPayload,
     getJwtSecret(),
-    { expiresIn: TOKEN_EXPIRY }
+    { expiresIn, algorithm: 'HS256' } as jwt.SignOptions
   );
 }
 
 export function verifyToken(token: string): JWTPayload | null {
   try {
-    return jwt.verify(token, getJwtSecret()) as JWTPayload;
+    // Pin the algorithm explicitly (defense-in-depth): the secret is always
+    // a plain HMAC string here, so this doesn't change accepted tokens
+    // today, but it forecloses any future algorithm-confusion path if an
+    // RS256-verified flow is ever added elsewhere against the same secret.
+    return jwt.verify(token, getJwtSecret(), { algorithms: ['HS256'] }) as JWTPayload;
   } catch {
     return null;
   }

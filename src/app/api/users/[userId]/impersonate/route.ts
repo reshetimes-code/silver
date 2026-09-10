@@ -26,8 +26,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!target.active) {
     return NextResponse.json({ error: 'This account is disabled' }, { status: 400 });
   }
+  // Impersonating another super_admin would let one admin silently act as
+  // (and read anything visible to) another admin's account — not something
+  // "view as this account_manager for support" needs.
+  if (target.role === 'super_admin') {
+    return NextResponse.json({ error: 'Cannot impersonate another super admin' }, { status: 400 });
+  }
 
-  const token = createToken(target);
+  // Short-lived — this token grants full access to the target's account, so
+  // it shouldn't carry the normal 7-day session lifetime for what's meant
+  // to be a brief support session.
+  const token = createToken(target, '2h');
+  console.log(`[impersonate] super_admin ${currentUser!.email} (${currentUser!.id}) started impersonating ${target.email} (${target.id})`);
 
   return NextResponse.json({
     token,

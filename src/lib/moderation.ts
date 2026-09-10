@@ -8,8 +8,11 @@ export interface ModerationResult {
 export async function moderateImage(base64Image: string): Promise<ModerationResult> {
   const apiKey = process.env.GOOGLE_API_KEY;
   if (!apiKey) {
-    console.warn('GOOGLE_API_KEY not set — skipping moderation');
-    return { status: 'approved' };
+    // Same fail-safe reasoning as the catch block below: a missing key is a
+    // config problem, not a signal that every photo is safe. Route to
+    // manual review instead of silently approving everything.
+    console.error('GOOGLE_API_KEY not set — flagging for manual review instead of skipping moderation');
+    return { status: 'pending_review', reason: 'moderation_unavailable' };
   }
 
   try {

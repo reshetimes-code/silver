@@ -14,12 +14,20 @@ export async function POST(request: NextRequest) {
     if (!file) {
       return NextResponse.json({ error: 'Missing file' }, { status: 400 });
     }
+    // The browser-supplied `file.type` is trusted for storage below, and
+    // later served back verbatim as the Content-Type — allow-list it to a
+    // real image type rather than an arbitrary client-controlled string.
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      return NextResponse.json({ error: 'Overlay must be a PNG, JPEG, or WebP image' }, { status: 400 });
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: 'Overlay file is too large (max 10MB)' }, { status: 400 });
+    }
 
     // Convert to base64 data URL for storage
     const buffer = Buffer.from(await file.arrayBuffer());
     const base64 = buffer.toString('base64');
-    const mimeType = file.type || 'image/png';
-    const dataUrl = `data:${mimeType};base64,${base64}`;
+    const dataUrl = `data:${file.type};base64,${base64}`;
 
     const eventId = formData.get('eventId') as string | null;
 

@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireSuperAdmin } from '@/lib/auth';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
-// POST /api/leads — public (called from event page)
+// POST /api/leads — public (called from event page and the marketing landing page)
 export async function POST(req: NextRequest) {
   try {
+    const ip = getClientIp(req);
+    const limit = checkRateLimit(`leads:post:${ip}`, 8, 10 * 60 * 1000);
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many submissions. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(limit.retryAfterSeconds) } }
+      );
+    }
+
     const { name, phone, eventDate, eventId } = await req.json();
 
     if (!phone || !eventDate) {
@@ -66,6 +76,14 @@ export async function GET(req: NextRequest) {
     // Public check: does a lead exist for this phone?
     const phone = req.nextUrl.searchParams.get('phone');
     if (phone) {
+      const ip = getClientIp(req);
+      const limit = checkRateLimit(`leads:phone-check:${ip}`, 30, 10 * 60 * 1000);
+      if (!limit.allowed) {
+        return NextResponse.json(
+          { error: 'Too many requests' },
+          { status: 429, headers: { 'Retry-After': String(limit.retryAfterSeconds) } }
+        );
+      }
       const existing = await prisma.lead.findFirst({
         where: { phone: phone.trim() },
         select: { id: true },

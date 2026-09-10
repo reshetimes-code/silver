@@ -18,7 +18,7 @@ export async function GET(request: Request) {
 
   let userId: string;
   try {
-    const payload = jwt.verify(state, getJwtSecret()) as { userId: string };
+    const payload = jwt.verify(state, getJwtSecret(), { algorithms: ['HS256'] }) as { userId: string };
     userId = payload.userId;
   } catch {
     return NextResponse.redirect(`${baseUrl}/dashboard/storage?error=dropbox_failed`);

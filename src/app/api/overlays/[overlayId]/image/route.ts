@@ -13,8 +13,10 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     return new NextResponse('Not found', { status: 404 });
   }
 
-  // Parse data URL
-  const match = overlay.url.match(/^data:([^;]+);base64,(.+)$/);
+  // Parse data URL — content type is only ever allowed to be a real image
+  // type, never passed through as-is (same reasoning as the photo image
+  // route: this must never be able to become an executable response).
+  const match = overlay.url.match(/^data:(image\/(?:png|jpeg|jpg|webp));base64,(.+)$/);
   if (!match) {
     return new NextResponse('Invalid format', { status: 500 });
   }
@@ -25,6 +27,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   return new NextResponse(buffer, {
     headers: {
       'Content-Type': contentType,
+      'Content-Disposition': 'inline; filename="overlay.png"',
+      'X-Content-Type-Options': 'nosniff',
       'Cache-Control': 'public, max-age=86400',
     },
   });

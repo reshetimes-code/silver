@@ -58,8 +58,8 @@ export async function PATCH(request: Request) {
     }
   }
 
-  if (password && password.length < 6) {
-    return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 });
+  if (password && password.length < 10) {
+    return NextResponse.json({ error: 'Password must be at least 10 characters' }, { status: 400 });
   }
 
   const updated = await prisma.user.update({
