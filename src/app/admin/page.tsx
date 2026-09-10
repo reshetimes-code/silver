@@ -1049,6 +1049,16 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
     });
   };
 
+  // Straight to this user's Dropbox connection screen — used when helping a
+  // new client connect their Dropbox account, instead of impersonating them
+  // and then hunting through the hamburger menu on their dashboard for it.
+  const handleLoginAsDropbox = async (user: UserData) => {
+    await withErrorAlert(async () => {
+      await api.loginAsUser(user.id);
+      window.location.href = '/dashboard/storage';
+    });
+  };
+
   if (loading) {
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-center py-12">
@@ -1162,6 +1172,13 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
                         </button>
                       )}
                       {!isSelf && (
+                        <button onClick={() => { setOpenMenuId(null); handleLoginAsDropbox(user); }}
+                          title={he ? 'עוזר ללקוח לחבר Dropbox' : "Help this client connect Dropbox"}
+                          className="px-3 py-2 rounded-lg text-xs font-bold bg-sky-500/15 text-sky-400">
+                          {he ? '📦 חיבור Dropbox' : '📦 Connect Dropbox'}
+                        </button>
+                      )}
+                      {!isSelf && (
                         <button onClick={() => { toggleRole(user); setOpenMenuId(null); }}
                           className="px-3 py-2 rounded-lg text-xs font-bold bg-white/8 text-white/70">
                           {he ? '🔁 החלף תפקיד' : '🔁 Switch role'}
@@ -1246,6 +1263,12 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
                           <button onClick={() => handleLoginAs(user)} title={he ? 'היכנס לחשבון' : 'Log in as'}
                             className="px-2 py-1 rounded-lg text-xs font-bold bg-purple-500/15 text-purple-400 hover:bg-purple-500/25">
                             {he ? 'כניסה' : 'Login as'}
+                          </button>
+                        )}
+                        {!isSelf && (
+                          <button onClick={() => handleLoginAsDropbox(user)} title={he ? 'עוזר ללקוח לחבר Dropbox' : 'Help this client connect Dropbox'}
+                            className="px-2 py-1 rounded-lg text-xs font-bold bg-sky-500/15 text-sky-400 hover:bg-sky-500/25">
+                            {he ? '📦 Dropbox' : '📦 Dropbox'}
                           </button>
                         )}
                         {!isSelf && (
