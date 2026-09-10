@@ -120,6 +120,17 @@ export async function revokeDropboxToken(accessToken: string): Promise<void> {
 // persisted (only the long-lived refreshToken lives in the DB).
 const userTokenCache = new Map<string, { accessToken: string; expiresAt: number }>();
 
+// Must be called right after a user's DropboxAccount row changes (connecting
+// a *different* Dropbox account, or disconnecting) — otherwise this cache
+// keeps serving the previous account's still-live access token for up to
+// ~4 hours after the switch, silently uploading new photos to the old
+// Dropbox account even though the DB (and the UI) already show the new one
+// connected. Keyed by our own userId, not by Dropbox account, so it must be
+// cleared explicitly rather than aging out on its own in this case.
+export function invalidateUserTokenCache(userId: string): void {
+  userTokenCache.delete(userId);
+}
+
 /**
  * Resolves the access token to use for a given account manager's own
  * Dropbox connection. Returns null if that user hasn't connected one yet —

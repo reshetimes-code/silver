@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma, ensureDropboxAccountTable } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
-import { getAccessTokenForUser, revokeDropboxToken } from '@/lib/dropbox-oauth';
+import { getAccessTokenForUser, revokeDropboxToken, invalidateUserTokenCache } from '@/lib/dropbox-oauth';
 
 export async function DELETE(request: Request) {
   const user = await getUserFromRequest(request);
@@ -20,6 +20,7 @@ export async function DELETE(request: Request) {
   }
 
   await prisma.dropboxAccount.deleteMany({ where: { userId: user.id } });
+  invalidateUserTokenCache(user.id);
 
   return NextResponse.json({ success: true });
 }

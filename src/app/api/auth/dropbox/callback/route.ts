@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import * as jwt from 'jsonwebtoken';
 import { prisma, ensureDropboxAccountTable } from '@/lib/db';
 import { getJwtSecret } from '@/lib/auth';
-import { exchangeCodeForToken, getCurrentAccount } from '@/lib/dropbox-oauth';
+import { exchangeCodeForToken, getCurrentAccount, invalidateUserTokenCache } from '@/lib/dropbox-oauth';
 import { getBaseUrl } from '@/lib/url';
 
 export async function GET(request: Request) {
@@ -54,6 +54,12 @@ export async function GET(request: Request) {
         ...(keepFolder ? {} : { rootFolderPath: null }),
       },
     });
+
+    // Without this, a still-cached access token from the *previous* Dropbox
+    // account keeps getting used for this userId for up to ~4 hours after
+    // switching — new photo uploads would silently keep landing in the old
+    // account even though this reconnect just succeeded (see caller docs).
+    invalidateUserTokenCache(userId);
 
     return NextResponse.redirect(`${baseUrl}/dashboard/storage?connected=1`);
   } catch (err) {
