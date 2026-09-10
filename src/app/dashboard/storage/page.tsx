@@ -82,6 +82,28 @@ export default function StoragePage() {
     setConnecting(false);
   };
 
+  // "Change account" sends the browser through Dropbox's own login flow
+  // again — but if this browser is still signed into Dropbox as the
+  // account already connected, Dropbox skips straight past its login
+  // screen and just re-approves that same account, which looks like the
+  // button did nothing. Dropbox doesn't offer an account-switcher inside
+  // that flow, so the only real fix is logging out of Dropbox itself
+  // first — tell people that instead of leaving them guessing.
+  const handleChangeAccount = async () => {
+    const result = await Swal.fire({
+      icon: 'info',
+      title: he ? 'להתחבר עם חשבון Dropbox אחר?' : 'Connect a different Dropbox account?',
+      html: he
+        ? 'אם עדיין מחוברים ל-Dropbox בדפדפן הזה עם אותו חשבון, הוא יאשר אותו שוב אוטומטית במקום לתת לבחור חשבון אחר.<br/><br/>כדי לחבר חשבון <b>אחר</b>: קודם <a href="https://www.dropbox.com/logout" target="_blank" style="color:#D4AF37">התנתקו מ-Dropbox כאן</a> (נפתח בטאב חדש), ואז חזרו ולחצו המשך.'
+        : "If this browser is still signed into Dropbox with the same account, it'll just re-approve it instantly instead of letting you pick another.<br/><br/>To connect a <b>different</b> account: first <a href=\"https://www.dropbox.com/logout\" target=\"_blank\" style=\"color:#D4AF37\">log out of Dropbox here</a> (opens a new tab), then come back and press Continue.",
+      showCancelButton: true, confirmButtonColor: '#D4AF37', cancelButtonColor: '#333',
+      confirmButtonText: he ? 'המשך' : 'Continue', cancelButtonText: he ? 'ביטול' : 'Cancel',
+      background: '#0a0a0a', color: '#fff',
+    });
+    if (!result.isConfirmed) return;
+    await handleConnect();
+  };
+
   const loadFolders = useCallback((path: string) => {
     setBrowsing(true);
     api.listDropboxFolders(path).then((data: { folders: FolderEntry[] }) => {
@@ -184,7 +206,7 @@ export default function StoragePage() {
                 <p className="text-white font-bold">{status.accountName}</p>
                 <p className="text-white/40 text-sm">{status.accountEmail}</p>
                 <div className="flex gap-2 mt-4">
-                  <button className="btn-secondary flex-1 text-xs" onClick={handleConnect} disabled={connecting}>
+                  <button className="btn-secondary flex-1 text-xs" onClick={handleChangeAccount} disabled={connecting}>
                     {he ? 'החלף חשבון' : 'Change account'}
                   </button>
                   <button className="flex-1 text-xs text-red-400/70 hover:text-red-400 transition-colors" onClick={handleDisconnect}>
