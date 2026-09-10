@@ -943,6 +943,18 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
   const [errors, setErrors] = useState<{ name?: boolean; email?: boolean }>({});
   const loader = useLoader();
 
+  // Actions dropdown for the mobile card layout — only one open at a time.
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!openMenuId) return;
+    const closeOnOutsideClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpenMenuId(null);
+    };
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    return () => document.removeEventListener('mousedown', closeOnOutsideClick);
+  }, [openMenuId]);
+
   const loadUsers = () => {
     api.getUsers().then((data: UserData[]) => { setUsers(data); setLoading(false); }).catch((err) => {
       setLoading(false);
@@ -1014,6 +1026,24 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
   };
 
   const handleLoginAs = async (user: UserData) => {
+    // The impersonate API call authenticates as whichever account is
+    // currently active. If an impersonation session is already open, that's
+    // the *impersonated* user's (non-admin) token — a second "log in as"
+    // click would use that token and get a confusing generic 403 instead of
+    // the real reason. Catch it here with a clear message and route back to
+    // admin first, rather than letting the request fail unexplained.
+    if (api.isImpersonating()) {
+      await Swal.fire({
+        icon: 'info',
+        title: he ? 'כבר בתוך התחזות למשתמש אחר' : 'Already impersonating another user',
+        text: he
+          ? 'קודם תחזור לניהול (הכפתור "חזרה לניהול" למעלה), ורק אז תוכל להיכנס לחשבון של משתמש נוסף.'
+          : 'Return to admin first (the "Return to admin" button at the top), then you can log in as a different user.',
+        confirmButtonColor: '#D4AF37', background: '#0a0a0a', color: '#fff',
+      });
+      return;
+    }
+
     const result = await Swal.fire({
       icon: 'question',
       title: he ? `להיכנס לחשבון של ${user.name}?` : `Log in as ${user.name}?`,
@@ -1091,7 +1121,88 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
         )}
       </AnimatePresence>
 
-      <div className="glass-card overflow-hidden">
+      {/* Mobile: card list with a per-user actions dropdown instead of a
+          side-scrolling 8-column table — nothing to scroll to discover. */}
+      <div className="sm:hidden glass-card overflow-hidden divide-y divide-white/5" dir={he ? 'rtl' : 'ltr'}>
+        {users.map((user) => {
+          const isSelf = user.id === currentUserId;
+          const menuOpen = openMenuId === user.id;
+          return (
+            <div key={user.id} className="p-3 flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="text-white font-bold text-sm truncate">
+                  {user.name}{isSelf && <span className="text-white/30 font-normal"> ({he ? 'אתה' : 'you'})</span>}
+                </div>
+                <div className="text-white/50 text-xs truncate" dir="ltr">{user.email}</div>
+                <div className="flex items-center flex-wrap gap-1.5 mt-1.5">
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${user.role === 'super_admin' ? 'bg-primary/20 text-[#D4AF37]' : 'bg-white/8 text-white/50'}`}>
+                    {user.role === 'super_admin' ? (he ? 'מנהל אתר' : 'Super Admin') : (he ? 'מנהל חשבון' : 'Account Mgr')}
+                  </span>
+                  <span className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full ${user.active ? 'text-green-400' : 'text-red-400'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${user.active ? 'bg-green-500' : 'bg-red-500'}`} />
+                    {user.active ? (he ? 'פעיל' : 'Active') : (he ? 'מושבת' : 'Disabled')}
+                  </span>
+                  <span className="text-[10px] text-white/30">{he ? 'אירועים' : 'events'}: {user._count.events}</span>
+                </div>
+              </div>
+
+              <div className="relative shrink-0" ref={menuOpen ? menuRef : undefined}>
+                <button onClick={() => setOpenMenuId(menuOpen ? null : user.id)}
+                  aria-label={he ? 'פעולות' : 'Actions'}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/8 text-white/60 hover:bg-white/15 hover:text-white text-lg leading-none">
+                  ⋮
+                </button>
+                <AnimatePresence>
+                  {menuOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+                      className="absolute z-20 top-full mt-1 min-w-[10rem] rounded-xl overflow-hidden border border-white/10 shadow-xl"
+                      style={{ background: '#141414', insetInlineEnd: 0 }}
+                    >
+                      <button onClick={() => { startEdit(user); setOpenMenuId(null); }}
+                        className="block w-full text-start px-4 py-2.5 text-sm text-blue-400 hover:bg-white/5">
+                        {he ? '✏️ ערוך' : '✏️ Edit'}
+                      </button>
+                      {!isSelf && (
+                        <button onClick={() => { setOpenMenuId(null); handleLoginAs(user); }}
+                          className="block w-full text-start px-4 py-2.5 text-sm text-purple-400 hover:bg-white/5">
+                          {he ? '👤 היכנס לחשבון' : '👤 Log in as'}
+                        </button>
+                      )}
+                      {!isSelf && (
+                        <button onClick={() => { toggleRole(user); setOpenMenuId(null); }}
+                          className="block w-full text-start px-4 py-2.5 text-sm text-white/70 hover:bg-white/5">
+                          {he ? '🔁 החלף תפקיד' : '🔁 Switch role'}
+                        </button>
+                      )}
+                      {!isSelf && (
+                        <button onClick={() => { toggleActive(user); setOpenMenuId(null); }}
+                          className="block w-full text-start px-4 py-2.5 text-sm text-white/70 hover:bg-white/5">
+                          {user.active ? (he ? '⏸️ השבת' : '⏸️ Disable') : (he ? '▶️ הפעל' : '▶️ Activate')}
+                        </button>
+                      )}
+                      {!isSelf && (
+                        <button onClick={() => { setOpenMenuId(null); handleDelete(user); }}
+                          className="block w-full text-start px-4 py-2.5 text-sm text-red-400 hover:bg-white/5">
+                          {he ? '🗑️ מחק' : '🗑️ Delete'}
+                        </button>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+          );
+        })}
+        {users.length === 0 && (
+          <div className="text-center py-8 text-white/30 text-sm">
+            {he ? 'אין משתמשים רשומים' : 'No registered users'}
+          </div>
+        )}
+      </div>
+
+      {/* Tablet/desktop: full table */}
+      <div className="hidden sm:block glass-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm" dir={he ? 'rtl' : 'ltr'}>
             <thead>
