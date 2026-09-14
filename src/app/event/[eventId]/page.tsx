@@ -34,6 +34,45 @@ type TimerValue = typeof TIMER_OPTIONS[number];
 const PHOTO_WIDTH = 1240;
 const PHOTO_HEIGHT = 1844;
 
+// Crops `source` (a live <video> frame, or a still photo's decoded bitmap)
+// exactly the way CSS `object-cover` crops the on-screen <video> element to
+// fill the screen, then downsamples to at most 1920px on the long edge.
+// Shared by both capture paths in captureNow() below (the native still-photo
+// path and the <video> frame-grab fallback) so the saved photo always
+// matches what the guest saw framed live either way.
+function coverCropToDataUrl(
+  source: CanvasImageSource,
+  srcW: number,
+  srcH: number,
+  dispW: number,
+  dispH: number,
+  mirror: boolean
+): string | null {
+  if (!srcW || !srcH) return null;
+  let cropX = 0, cropY = 0, cropW = srcW, cropH = srcH;
+  if (dispW > 0 && dispH > 0) {
+    const coverScale = Math.max(dispW / srcW, dispH / srcH);
+    cropW = dispW / coverScale;
+    cropH = dispH / coverScale;
+    cropX = (srcW - cropW) / 2;
+    cropY = (srcH - cropH) / 2;
+  }
+  const scale = Math.min(1, 1920 / Math.max(cropW, cropH));
+  const cw = Math.round(cropW * scale);
+  const ch = Math.round(cropH * scale);
+  const canvas = document.createElement('canvas');
+  canvas.width = cw;
+  canvas.height = ch;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  if (mirror) {
+    ctx.translate(cw, 0);
+    ctx.scale(-1, 1);
+  }
+  ctx.drawImage(source, cropX, cropY, cropW, cropH, 0, 0, cw, ch);
+  return canvas.toDataURL('image/jpeg', 0.95);
+}
+
 export default function CapturePhotoPage() {
   const params = useParams();
   const router = useRouter();
@@ -100,6 +139,14 @@ export default function CapturePhotoPage() {
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+  // True while a lens switch (+/- zoom) has torn down the old camera stream
+  // and is waiting for the new one to come up. Switching lenses works by
+  // changing `selectedDeviceId`, which remounts the whole <Webcam> (see its
+  // `key` below) and requests a brand-new getUserMedia stream — so a second
+  // tap before that finishes fires an overlapping camera request, which is a
+  // well-known source of a frozen/black preview on mobile browsers. Blocking
+  // taps until onUserMedia fires again for the new stream avoids that.
+  const [lensSwitching, setLensSwitching] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState<TimerValue>(0);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [phoneInput, setPhoneInput] = useState('');
@@ -347,28 +394,57 @@ export default function CapturePhotoPage() {
         return;
       }
 
-      const vw = video.videoWidth;
-      const vh = video.videoHeight;
-      const scale = Math.min(1, 1920 / Math.max(vw, vh));
-      const cw = Math.round(vw * scale);
-      const ch = Math.round(vh * scale);
+      // The live preview shows the video with CSS `object-cover`, which
+      // crops the native camera frame to fill the screen (e.g. a wide
+      // 4:3 sensor frame gets its sides trimmed to match the tall on-screen
+      // viewfinder). Both capture paths below need to reproduce that same
+      // crop, or the saved photo ends up showing more of the scene than the
+      // guest actually saw framed ("zoomed out" compared to the preview).
+      const dispW = video.clientWidth;
+      const dispH = video.clientHeight;
+      const mirror = facingMode === 'user';
 
-      const captureCanvas = document.createElement('canvas');
-      captureCanvas.width = cw;
-      captureCanvas.height = ch;
-      const ctx = captureCanvas.getContext('2d')!;
+      // Prefer the phone's native still-photo capture pipeline (ImageCapture)
+      // over grabbing a frame from the live <video> stream. The live stream
+      // is tuned for smooth real-time preview — lower per-frame quality,
+      // simpler fixed exposure — while an actual photo goes through the full
+      // camera ISP (proper auto-exposure/HDR, noise reduction). That gap is
+      // exactly why a guest's photo came out visibly darker/noisier than the
+      // same shot taken with the phone's own camera app. ImageCapture is
+      // Chromium-only (no Safari/iOS support), so this is best-effort and
+      // always falls back to the old video-frame method below on failure.
+      const stream = video.srcObject instanceof MediaStream ? video.srcObject : null;
+      const track = stream?.getVideoTracks()[0];
+      const ImageCaptureCtor = (window as unknown as {
+        ImageCapture?: new (t: MediaStreamTrack) => { takePhoto: () => Promise<Blob> };
+      }).ImageCapture;
 
-      if (facingMode === 'user') {
-        ctx.translate(cw, 0);
-        ctx.scale(-1, 1);
+      if (track && ImageCaptureCtor) {
+        try {
+          const imageCapture = new ImageCaptureCtor(track);
+          const blob = await imageCapture.takePhoto();
+          const bitmap = await createImageBitmap(blob);
+          const drawn = coverCropToDataUrl(bitmap, bitmap.width, bitmap.height, dispW, dispH, mirror);
+          bitmap.close();
+          if (drawn) {
+            setRawImage(drawn);
+            setCropScale(1.0);
+            setCropPos({ x: 0, y: 0 });
+            setMode('crop');
+            return;
+          }
+        } catch (icErr) {
+          console.warn('ImageCapture.takePhoto failed, falling back to video frame:', icErr);
+        }
       }
-      ctx.drawImage(video, 0, 0, cw, ch);
 
-      const fullResImage = captureCanvas.toDataURL('image/jpeg', 0.95);
-      setRawImage(fullResImage);
-      setCropScale(1.0);
-      setCropPos({ x: 0, y: 0 });
-      setMode('crop');
+      const drawn = coverCropToDataUrl(video, video.videoWidth, video.videoHeight, dispW, dispH, mirror);
+      if (drawn) {
+        setRawImage(drawn);
+        setCropScale(1.0);
+        setCropPos({ x: 0, y: 0 });
+        setMode('crop');
+      }
     } catch (err) {
       console.error('Capture failed:', err);
       const fallback = webcamRef.current?.getScreenshot();
@@ -382,6 +458,34 @@ export default function CapturePhotoPage() {
       const videoInputs = devices.filter(d => d.kind === 'videoinput');
       setVideoDevices(videoInputs);
     }).catch(() => {});
+    setLensSwitching(false);
+
+    // Best-effort: explicitly ask for continuous autofocus/exposure/white-
+    // balance where the device exposes it. Some Android browsers otherwise
+    // leave these locked at whatever they happened to land on when the
+    // stream started instead of continuing to re-meter up to the shutter
+    // press, which is part of why a guest's photo can come out dimmer/softer
+    // than the same shot taken with the phone's own camera app.
+    try {
+      const stream = webcamRef.current?.video?.srcObject;
+      const track = stream instanceof MediaStream ? stream.getVideoTracks()[0] : undefined;
+      const caps = track?.getCapabilities?.() as (MediaTrackCapabilities & {
+        focusMode?: string[]; exposureMode?: string[]; whiteBalanceMode?: string[];
+      }) | undefined;
+      const advanced: MediaTrackConstraintSet[] = [];
+      if (caps?.focusMode?.includes('continuous')) advanced.push({ focusMode: 'continuous' } as MediaTrackConstraintSet);
+      if (caps?.exposureMode?.includes('continuous')) advanced.push({ exposureMode: 'continuous' } as MediaTrackConstraintSet);
+      if (caps?.whiteBalanceMode?.includes('continuous')) advanced.push({ whiteBalanceMode: 'continuous' } as MediaTrackConstraintSet);
+      if (track && advanced.length) track.applyConstraints({ advanced }).catch(() => {});
+    } catch { /* best-effort only */ }
+  }, []);
+
+  // If the lens just switched to (via its deviceId) can't actually be opened,
+  // the new stream never comes up and onUserMedia above never fires — without
+  // this, lensSwitching would stay stuck true and permanently disable the
+  // zoom buttons rather than just leaving the previous lens in place.
+  const handleWebcamError = useCallback(() => {
+    setLensSwitching(false);
   }, []);
 
   const cancelTimer = useCallback(() => {
@@ -496,6 +600,14 @@ export default function CapturePhotoPage() {
       ctx.drawImage(photoCanvas, Math.round(drawX), Math.round(drawY));
 
       const result = canvas.toDataURL('image/jpeg', 0.92);
+
+      // Stash the untouched original (straight off the camera/upload, before
+      // the blurred-background composite above) so the guest's actual photo
+      // — not the effect applied to it — is what ends up in the "Source
+      // Photos" folder later. Best-effort: sessionStorage is already tight
+      // with the main image below, so a quota failure here just means no
+      // source copy is saved, not a broken capture flow.
+      try { sessionStorage.setItem('photobooth-original-image', rawImage); } catch { /* ignore */ }
 
       // Save to session and go to preview
       try {
@@ -781,14 +893,17 @@ export default function CapturePhotoPage() {
             // that low resolution into the saved photo, which then gets
             // upscaled to the fixed print canvas and comes out blurry.
             // Asking for `ideal` (not exact/min) degrades gracefully on
-            // cameras that can't reach it.
+            // cameras that can't reach it. Print quality is the whole point
+            // of this app, so ask high (most rear cameras go well past this;
+            // ideal just clamps to whatever the device actually supports).
             videoConstraints={selectedDeviceId
-              ? { deviceId: { exact: selectedDeviceId }, width: { ideal: 1920 }, height: { ideal: 1920 } }
-              : { facingMode, width: { ideal: 1920 }, height: { ideal: 1920 } }
+              ? { deviceId: { exact: selectedDeviceId }, width: { ideal: 3840 }, height: { ideal: 3840 } }
+              : { facingMode, width: { ideal: 3840 }, height: { ideal: 3840 } }
             }
             className="absolute inset-0 w-full h-full object-cover"
             mirrored={facingMode === 'user' && !selectedDeviceId}
             onUserMedia={handleWebcamReady}
+            onUserMediaError={handleWebcamError}
           />
 
           {/* Viewfinder corners */}
@@ -833,18 +948,25 @@ export default function CapturePhotoPage() {
               {(() => {
                 const backDevices = videoDevices.filter(d => !d.label.toLowerCase().includes('front'));
                 const currentIndex = Math.max(0, backDevices.findIndex(d => d.deviceId === selectedDeviceId));
+                // Disabled during the countdown/capture (switching lenses tears
+                // down and restarts the camera stream, which would otherwise
+                // yank the frame out from under an in-progress shot) and while
+                // a previous tap's switch hasn't finished yet.
+                const disabled = countdown !== null || lensSwitching;
                 const step = (delta: number) => {
+                  if (disabled) return;
                   const next = (currentIndex + delta + backDevices.length) % backDevices.length;
+                  setLensSwitching(true);
                   setSelectedDeviceId(backDevices[next].deviceId);
                 };
                 return (
                   <>
-                    <button className="zoom-btn" onClick={() => step(-1)} aria-label={he ? 'הקטן זום' : 'Zoom out'}>
+                    <button className="zoom-btn" disabled={disabled} onClick={() => step(-1)} aria-label={he ? 'הקטן זום' : 'Zoom out'}>
                       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                         <path d="M5 12h14" strokeLinecap="round" />
                       </svg>
                     </button>
-                    <button className="zoom-btn" onClick={() => step(1)} aria-label={he ? 'הגדל זום' : 'Zoom in'}>
+                    <button className="zoom-btn" disabled={disabled} onClick={() => step(1)} aria-label={he ? 'הגדל זום' : 'Zoom in'}>
                       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                         <path d="M12 5v14M5 12h14" strokeLinecap="round" />
                       </svg>

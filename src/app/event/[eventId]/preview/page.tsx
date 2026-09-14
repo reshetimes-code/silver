@@ -51,6 +51,12 @@ async function buildComposite(
   return canvas.toDataURL('image/jpeg', 0.92);
 }
 
+// Mirrors the server's IMAGE_DATA_URL check in /api/photos — the original
+// can come from an arbitrary uploaded file (not just a camera capture, which
+// is always JPEG), so a guest uploading e.g. a HEIC/GIF file must not turn
+// into a failed print; just skip the source copy for those instead.
+const SUPPORTED_IMAGE_DATA_URL = /^data:image\/(png|jpeg|jpg|webp);base64,/;
+
 function seededRandom(seed: number): number {
   const x = Math.sin(seed * 9301 + 49297) * 49297;
   return x - Math.floor(x);
@@ -67,6 +73,7 @@ export default function PreviewPage() {
   const { locale, incrementDevicePrints, getDevicePrintCount, guestPhone } = useStore();
 
   const [image, setImage] = useState<string | null>(null);
+  const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [event, setEvent] = useState<EventData | null>(null);
   const [overlays, setOverlays] = useState<OverlayData[]>([]);
   const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null);
@@ -84,6 +91,8 @@ export default function PreviewPage() {
   useEffect(() => {
     const stored = sessionStorage.getItem('photobooth-captured-image');
     if (stored) setImage(stored);
+    const storedOriginal = sessionStorage.getItem('photobooth-original-image');
+    if (storedOriginal) setOriginalImage(storedOriginal);
 
     Promise.all([api.getEvent(eventId), api.getOverlays(eventId, true)]).then(([ev, ovs]) => {
       setEvent(ev);
@@ -118,13 +127,17 @@ export default function PreviewPage() {
     try {
       let finalImage = image;
       let finalOverlayId = selectedOverlayId;
-      let rawImage: string | undefined;
+      // The untouched original (straight off the camera/upload, before the
+      // blurred-background effect and before any frame) — saved to a
+      // separate "Source Photos" folder in Dropbox so frames/edits can be
+      // applied manually later. Falls back to the effected `image` for old
+      // sessions that never stashed an original (e.g. mid-upgrade).
+      let rawImage: string | undefined =
+        (originalImage && SUPPORTED_IMAGE_DATA_URL.test(originalImage)) ? originalImage : undefined;
       if (selectedOverlayId !== 'none' && selectedOverlay) {
         finalImage = await buildComposite(image, selectedOverlay.url, photoAdjust);
         finalOverlayId = 'none';
-        // Keep the pre-frame version too — saved to a separate "Source
-        // Photos" folder in Dropbox so frames can be applied manually later.
-        rawImage = image;
+        if (!rawImage) rawImage = image;
       }
 
       const result = await api.submitPhoto({
@@ -153,6 +166,7 @@ export default function PreviewPage() {
       setPrintSuccess(true);
       setPrinting(false);
       sessionStorage.removeItem('photobooth-captured-image');
+      sessionStorage.removeItem('photobooth-original-image');
     } catch {
       setPrinting(false);
       setModerationError(he ? 'שגיאת רשת, נסה שוב' : 'Network error, please try again');
