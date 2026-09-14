@@ -771,9 +771,20 @@ export default function CapturePhotoPage() {
           {/* Camera fills entire screen */}
           <Webcam key={selectedDeviceId || facingMode} ref={webcamRef} audio={false}
             screenshotFormat="image/jpeg" screenshotQuality={1}
+            // Without explicit width/height hints, mobile browsers commonly
+            // negotiate a much lower default resolution for the front
+            // ("user") camera than the back one (which tends to default to
+            // a high-res profile) — the live preview still looks sharp
+            // because the <video> element is just CSS-scaled to fill the
+            // screen, but captureNow() below reads the actual negotiated
+            // video.videoWidth/videoHeight, so a low-res front stream bakes
+            // that low resolution into the saved photo, which then gets
+            // upscaled to the fixed print canvas and comes out blurry.
+            // Asking for `ideal` (not exact/min) degrades gracefully on
+            // cameras that can't reach it.
             videoConstraints={selectedDeviceId
-              ? { deviceId: { exact: selectedDeviceId } }
-              : { facingMode }
+              ? { deviceId: { exact: selectedDeviceId }, width: { ideal: 1920 }, height: { ideal: 1920 } }
+              : { facingMode, width: { ideal: 1920 }, height: { ideal: 1920 } }
             }
             className="absolute inset-0 w-full h-full object-cover"
             mirrored={facingMode === 'user' && !selectedDeviceId}
