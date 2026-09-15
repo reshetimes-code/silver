@@ -95,10 +95,6 @@ export default function CapturePhotoPage() {
   }, [mode]);
   const [phoneInput, setPhoneInput] = useState('');
   const [phoneError, setPhoneError] = useState(false);
-  // "Get ready" countdown shown before handing off to the native camera app
-  // (see startTakePhoto below) — null when not counting down.
-  const [readyCountdown, setReadyCountdown] = useState<number | null>(null);
-  const readyCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Fixed 9:16 aspect ratio
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Hidden input with `capture="user"` — on mobile browsers this opens the
@@ -111,9 +107,20 @@ export default function CapturePhotoPage() {
   // Handing the actual shutter press off to the OS camera app gets the
   // guest the phone's full quality pipeline (proper exposure/HDR, real
   // optical zoom, flash) on every device, iPhone included — the guest just
-  // loses our in-app on-screen zoom buttons, and has to trigger the shot
-  // themselves once the native camera opens (readyCountdown below only gets
-  // them ready beforehand — there's no way to press that shutter for them).
+  // loses our in-app timer and on-screen zoom buttons, and has to trigger
+  // the shot themselves once the native camera opens.
+  //
+  // A "get ready" countdown *before* opening the camera was tried and
+  // reverted: mobile browsers only allow a file input's picker (which is
+  // what opens the native camera app here) to be triggered synchronously
+  // within a direct, original user gesture (tap/click) — clicking it from a
+  // setInterval/setTimeout callback a few seconds later, even one started
+  // by that same tap, silently does nothing on Chrome/Android and Safari/
+  // iOS alike. There's no way around this from the web platform; it isn't a
+  // bug in our code to fix, it's a hard security restriction on all major
+  // mobile browsers. Any "get ready" pause has to end in the guest
+  // themselves tapping a real button to open the camera, not a timer doing
+  // it automatically.
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -139,42 +146,6 @@ export default function CapturePhotoPage() {
       setMode('choose');
     }
   }, [guestPhone, mode]);
-
-  useEffect(() => {
-    return () => {
-      if (readyCountdownRef.current) clearInterval(readyCountdownRef.current);
-    };
-  }, []);
-
-  // Shows a short "get ready" countdown before opening the native camera app
-  // (see cameraInputRef) — the guest still has to press that app's own
-  // shutter button themselves once it opens (there's no way for us to do
-  // that for them), this just gives them a moment to get in position first,
-  // similar to what the in-app timer used to do before the shot itself.
-  const cancelReadyCountdown = useCallback(() => {
-    if (readyCountdownRef.current) {
-      clearInterval(readyCountdownRef.current);
-      readyCountdownRef.current = null;
-    }
-    setReadyCountdown(null);
-  }, []);
-
-  const startTakePhoto = useCallback(() => {
-    if (readyCountdownRef.current) return;
-    let remaining = 3;
-    setReadyCountdown(remaining);
-    readyCountdownRef.current = setInterval(() => {
-      remaining -= 1;
-      if (remaining <= 0) {
-        clearInterval(readyCountdownRef.current!);
-        readyCountdownRef.current = null;
-        setReadyCountdown(null);
-        cameraInputRef.current?.click();
-      } else {
-        setReadyCountdown(remaining);
-      }
-    }, 1000);
-  }, []);
 
   const validatePhone = (phone: string) => {
     const cleaned = phone.replace(/[\s\-()]/g, '');
@@ -735,19 +706,6 @@ export default function CapturePhotoPage() {
         <p className="text-sm text-white/30 mt-0.5">{event.date.replace(/-/g, '.')}</p>
       </motion.div>
 
-      {/* ===== "GET READY" COUNTDOWN — shown before handing off to the native
-          camera app, so guests get a moment to pose like the old in-app
-          timer gave them (they still have to tap that app's own shutter). */}
-      {readyCountdown !== null && (
-        <div className="fixed inset-0 z-[999] bg-black flex flex-col items-center justify-center gap-6">
-          <p className="text-white/70 text-lg font-bold">{he ? 'התכוננו!' : 'Get ready!'}</p>
-          <span className="countdown-number">{readyCountdown}</span>
-          <button className="btn-secondary px-8" onClick={cancelReadyCountdown}>
-            {he ? 'ביטול' : 'Cancel'}
-          </button>
-        </div>
-      )}
-
       {/* ===== CROP SCREEN — adjust photo in the print-lab frame ===== */}
       {mode === 'crop' && rawImage && (
         <div className="fixed inset-0 z-[999] bg-black flex flex-col" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
@@ -830,7 +788,7 @@ export default function CapturePhotoPage() {
               </div>
 
               <motion.button className="btn-glow w-full text-lg" whileTap={{ scale: 0.96 }}
-                onClick={startTakePhoto}>
+                onClick={() => cameraInputRef.current?.click()}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <rect x="2" y="6" width="20" height="14" rx="3" />
                   <circle cx="12" cy="13" r="4" />
