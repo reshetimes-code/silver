@@ -13,7 +13,6 @@ import LanguageToggle from '@/components/ui/LanguageToggle';
 import HomeLogo from '@/components/ui/HomeLogo';
 import Footer from '@/components/ui/Footer';
 import ParticleBackground from '@/components/ui/ParticleBackground';
-import Webcam from 'react-webcam';
 
 interface EventData {
   id: string;
@@ -23,9 +22,6 @@ interface EventData {
   active: boolean;
 }
 
-const TIMER_OPTIONS = [0, 3, 5, 10] as const;
-type TimerValue = typeof TIMER_OPTIONS[number];
-
 // Print-lab size (~4x6" @ ~310 DPI) rather than a phone-screen 9:16 ratio —
 // the physical printer expects this exact aspect ratio, so the whole
 // capture pipeline (viewfinder crop, composite canvas) targets it directly
@@ -33,45 +29,6 @@ type TimerValue = typeof TIMER_OPTIONS[number];
 // part of the frame/photo to fit.
 const PHOTO_WIDTH = 1240;
 const PHOTO_HEIGHT = 1844;
-
-// Crops `source` (a live <video> frame, or a still photo's decoded bitmap)
-// exactly the way CSS `object-cover` crops the on-screen <video> element to
-// fill the screen, then downsamples to at most 1920px on the long edge.
-// Shared by both capture paths in captureNow() below (the native still-photo
-// path and the <video> frame-grab fallback) so the saved photo always
-// matches what the guest saw framed live either way.
-function coverCropToDataUrl(
-  source: CanvasImageSource,
-  srcW: number,
-  srcH: number,
-  dispW: number,
-  dispH: number,
-  mirror: boolean
-): string | null {
-  if (!srcW || !srcH) return null;
-  let cropX = 0, cropY = 0, cropW = srcW, cropH = srcH;
-  if (dispW > 0 && dispH > 0) {
-    const coverScale = Math.max(dispW / srcW, dispH / srcH);
-    cropW = dispW / coverScale;
-    cropH = dispH / coverScale;
-    cropX = (srcW - cropW) / 2;
-    cropY = (srcH - cropH) / 2;
-  }
-  const scale = Math.min(1, 1920 / Math.max(cropW, cropH));
-  const cw = Math.round(cropW * scale);
-  const ch = Math.round(cropH * scale);
-  const canvas = document.createElement('canvas');
-  canvas.width = cw;
-  canvas.height = ch;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-  if (mirror) {
-    ctx.translate(cw, 0);
-    ctx.scale(-1, 1);
-  }
-  ctx.drawImage(source, cropX, cropY, cropW, cropH, 0, 0, cw, ch);
-  return canvas.toDataURL('image/jpeg', 0.95);
-}
 
 export default function CapturePhotoPage() {
   const params = useParams();
@@ -82,7 +39,7 @@ export default function CapturePhotoPage() {
 
   const [event, setEvent] = useState<EventData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [mode, setMode] = useState<'phone' | 'choose' | 'camera' | 'upload' | 'crop'>('phone');
+  const [mode, setMode] = useState<'phone' | 'choose' | 'upload' | 'crop'>('phone');
   const [rawImage, setRawImage] = useState<string | null>(null); // before crop
   const [capturedImage, setCapturedImage] = useState<string | null>(null); // after crop
   const [cropScale, setCropScale] = useState(1.0);
@@ -136,25 +93,23 @@ export default function CapturePhotoPage() {
       el.removeEventListener('touchend', onTouchEnd);
     };
   }, [mode]);
-  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
-  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
-  // True while a lens switch (+/- zoom) has torn down the old camera stream
-  // and is waiting for the new one to come up. Switching lenses works by
-  // changing `selectedDeviceId`, which remounts the whole <Webcam> (see its
-  // `key` below) and requests a brand-new getUserMedia stream — so a second
-  // tap before that finishes fires an overlapping camera request, which is a
-  // well-known source of a frozen/black preview on mobile browsers. Blocking
-  // taps until onUserMedia fires again for the new stream avoids that.
-  const [lensSwitching, setLensSwitching] = useState(false);
-  const [timerSeconds, setTimerSeconds] = useState<TimerValue>(0);
-  const [countdown, setCountdown] = useState<number | null>(null);
   const [phoneInput, setPhoneInput] = useState('');
   const [phoneError, setPhoneError] = useState(false);
   // Fixed 9:16 aspect ratio
-  const webcamRef = useRef<Webcam>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Hidden input with `capture="environment"` — on mobile browsers this
+  // opens the phone's own native camera app instead of our custom in-app
+  // camera. Guests' photos taken through our old getUserMedia-based capture
+  // came out visibly darker/noisier than the same shot taken with the
+  // phone's own camera app (the live preview stream is tuned for smooth
+  // real-time display, not best-quality stills, and on iOS there's no way
+  // to reach the native still-photo pipeline from the browser at all).
+  // Handing the actual shutter press off to the OS camera app gets the
+  // guest the phone's full quality pipeline (proper exposure/HDR, real
+  // optical zoom, flash) on every device, iPhone included — the guest just
+  // loses our in-app countdown timer and on-screen zoom buttons, since the
+  // OS's own camera UI takes over for the shot itself.
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const isRtl = locale === 'he';
@@ -179,12 +134,6 @@ export default function CapturePhotoPage() {
       setMode('choose');
     }
   }, [guestPhone, mode]);
-
-  useEffect(() => {
-    return () => {
-      if (countdownRef.current) clearInterval(countdownRef.current);
-    };
-  }, []);
 
   const validatePhone = (phone: string) => {
     const cleaned = phone.replace(/[\s\-()]/g, '');
@@ -384,138 +333,6 @@ export default function CapturePhotoPage() {
       img.src = imageSrc;
     });
   }, []);
-
-  const captureNow = useCallback(async () => {
-    try {
-      const video = webcamRef.current?.video;
-      if (!video || !video.videoWidth) {
-        const fallback = webcamRef.current?.getScreenshot();
-        if (fallback) { setRawImage(fallback); setMode('crop'); }
-        return;
-      }
-
-      // The live preview shows the video with CSS `object-cover`, which
-      // crops the native camera frame to fill the screen (e.g. a wide
-      // 4:3 sensor frame gets its sides trimmed to match the tall on-screen
-      // viewfinder). Both capture paths below need to reproduce that same
-      // crop, or the saved photo ends up showing more of the scene than the
-      // guest actually saw framed ("zoomed out" compared to the preview).
-      const dispW = video.clientWidth;
-      const dispH = video.clientHeight;
-      const mirror = facingMode === 'user';
-
-      // Prefer the phone's native still-photo capture pipeline (ImageCapture)
-      // over grabbing a frame from the live <video> stream. The live stream
-      // is tuned for smooth real-time preview — lower per-frame quality,
-      // simpler fixed exposure — while an actual photo goes through the full
-      // camera ISP (proper auto-exposure/HDR, noise reduction). That gap is
-      // exactly why a guest's photo came out visibly darker/noisier than the
-      // same shot taken with the phone's own camera app. ImageCapture is
-      // Chromium-only (no Safari/iOS support), so this is best-effort and
-      // always falls back to the old video-frame method below on failure.
-      const stream = video.srcObject instanceof MediaStream ? video.srcObject : null;
-      const track = stream?.getVideoTracks()[0];
-      const ImageCaptureCtor = (window as unknown as {
-        ImageCapture?: new (t: MediaStreamTrack) => { takePhoto: () => Promise<Blob> };
-      }).ImageCapture;
-
-      if (track && ImageCaptureCtor) {
-        try {
-          const imageCapture = new ImageCaptureCtor(track);
-          const blob = await imageCapture.takePhoto();
-          const bitmap = await createImageBitmap(blob);
-          const drawn = coverCropToDataUrl(bitmap, bitmap.width, bitmap.height, dispW, dispH, mirror);
-          bitmap.close();
-          if (drawn) {
-            setRawImage(drawn);
-            setCropScale(1.0);
-            setCropPos({ x: 0, y: 0 });
-            setMode('crop');
-            return;
-          }
-        } catch (icErr) {
-          console.warn('ImageCapture.takePhoto failed, falling back to video frame:', icErr);
-        }
-      }
-
-      const drawn = coverCropToDataUrl(video, video.videoWidth, video.videoHeight, dispW, dispH, mirror);
-      if (drawn) {
-        setRawImage(drawn);
-        setCropScale(1.0);
-        setCropPos({ x: 0, y: 0 });
-        setMode('crop');
-      }
-    } catch (err) {
-      console.error('Capture failed:', err);
-      const fallback = webcamRef.current?.getScreenshot();
-      if (fallback) { setRawImage(fallback); setMode('crop'); }
-    }
-  }, [facingMode]);
-
-  // Enumerate video devices after camera permission is granted
-  const handleWebcamReady = useCallback(() => {
-    navigator.mediaDevices.enumerateDevices().then(devices => {
-      const videoInputs = devices.filter(d => d.kind === 'videoinput');
-      setVideoDevices(videoInputs);
-    }).catch(() => {});
-    setLensSwitching(false);
-
-    // Best-effort: explicitly ask for continuous autofocus/exposure/white-
-    // balance where the device exposes it. Some Android browsers otherwise
-    // leave these locked at whatever they happened to land on when the
-    // stream started instead of continuing to re-meter up to the shutter
-    // press, which is part of why a guest's photo can come out dimmer/softer
-    // than the same shot taken with the phone's own camera app.
-    try {
-      const stream = webcamRef.current?.video?.srcObject;
-      const track = stream instanceof MediaStream ? stream.getVideoTracks()[0] : undefined;
-      const caps = track?.getCapabilities?.() as (MediaTrackCapabilities & {
-        focusMode?: string[]; exposureMode?: string[]; whiteBalanceMode?: string[];
-      }) | undefined;
-      const advanced: MediaTrackConstraintSet[] = [];
-      if (caps?.focusMode?.includes('continuous')) advanced.push({ focusMode: 'continuous' } as MediaTrackConstraintSet);
-      if (caps?.exposureMode?.includes('continuous')) advanced.push({ exposureMode: 'continuous' } as MediaTrackConstraintSet);
-      if (caps?.whiteBalanceMode?.includes('continuous')) advanced.push({ whiteBalanceMode: 'continuous' } as MediaTrackConstraintSet);
-      if (track && advanced.length) track.applyConstraints({ advanced }).catch(() => {});
-    } catch { /* best-effort only */ }
-  }, []);
-
-  // If the lens just switched to (via its deviceId) can't actually be opened,
-  // the new stream never comes up and onUserMedia above never fires — without
-  // this, lensSwitching would stay stuck true and permanently disable the
-  // zoom buttons rather than just leaving the previous lens in place.
-  const handleWebcamError = useCallback(() => {
-    setLensSwitching(false);
-  }, []);
-
-  const cancelTimer = useCallback(() => {
-    if (countdownRef.current) {
-      clearInterval(countdownRef.current);
-      countdownRef.current = null;
-    }
-    setCountdown(null);
-  }, []);
-
-  const capture = useCallback(() => {
-    if (countdownRef.current) return;
-    if (timerSeconds === 0) {
-      captureNow();
-      return;
-    }
-    let remaining = timerSeconds;
-    setCountdown(remaining);
-    countdownRef.current = setInterval(() => {
-      remaining -= 1;
-      if (remaining <= 0) {
-        clearInterval(countdownRef.current!);
-        countdownRef.current = null;
-        setCountdown(null);
-        captureNow();
-      } else {
-        setCountdown(remaining);
-      }
-    }, 1000);
-  }, [timerSeconds, captureNow]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -877,133 +694,6 @@ export default function CapturePhotoPage() {
         <p className="text-sm text-white/30 mt-0.5">{event.date.replace(/-/g, '.')}</p>
       </motion.div>
 
-      {/* ===== CAMERA FULLSCREEN ===== */}
-      {mode === 'camera' && !capturedImage && (
-        <div className="fixed inset-0 z-[999] bg-black" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
-          {/* Camera fills entire screen */}
-          <Webcam key={selectedDeviceId || facingMode} ref={webcamRef} audio={false}
-            screenshotFormat="image/jpeg" screenshotQuality={1}
-            // Without explicit width/height hints, mobile browsers commonly
-            // negotiate a much lower default resolution for the front
-            // ("user") camera than the back one (which tends to default to
-            // a high-res profile) — the live preview still looks sharp
-            // because the <video> element is just CSS-scaled to fill the
-            // screen, but captureNow() below reads the actual negotiated
-            // video.videoWidth/videoHeight, so a low-res front stream bakes
-            // that low resolution into the saved photo, which then gets
-            // upscaled to the fixed print canvas and comes out blurry.
-            // Asking for `ideal` (not exact/min) degrades gracefully on
-            // cameras that can't reach it. Print quality is the whole point
-            // of this app, so ask high (most rear cameras go well past this;
-            // ideal just clamps to whatever the device actually supports).
-            videoConstraints={selectedDeviceId
-              ? { deviceId: { exact: selectedDeviceId }, width: { ideal: 3840 }, height: { ideal: 3840 } }
-              : { facingMode, width: { ideal: 3840 }, height: { ideal: 3840 } }
-            }
-            className="absolute inset-0 w-full h-full object-cover"
-            mirrored={facingMode === 'user' && !selectedDeviceId}
-            onUserMedia={handleWebcamReady}
-            onUserMediaError={handleWebcamError}
-          />
-
-          {/* Viewfinder corners */}
-          <div className="viewfinder-corner tl" /><div className="viewfinder-corner tr" />
-          <div className="viewfinder-corner bl" /><div className="viewfinder-corner br" />
-
-          {/* Top overlay: timer + prints remaining */}
-          <div className="absolute top-0 left-0 right-0 z-20 p-4 flex items-center justify-between"
-            style={{
-              background: 'linear-gradient(180deg, rgba(0,0,0,0.55) 0%, transparent 100%)',
-              opacity: countdown !== null ? 0.3 : 1,
-              pointerEvents: countdown !== null ? 'none' : 'auto',
-              // Push below the phone's notch/status bar/camera cutout — otherwise
-              // the timer buttons sit under it and can't be tapped.
-              paddingTop: 'calc(1rem + var(--safe-top, 0px))',
-            }}>
-            <div className="flex items-center gap-1.5">
-              {TIMER_OPTIONS.map((sec) => (
-                <button key={sec}
-                  className={`px-2.5 py-1.5 rounded-full text-xs font-bold ${timerSeconds === sec ? 'bg-primary text-black' : 'bg-black/40 text-white/60'}`}
-                  onClick={() => { setTimerSeconds(sec); cancelTimer(); }}>
-                  {sec === 0 ? (he ? 'ללא' : 'Off') : `${sec}s`}
-                </button>
-              ))}
-            </div>
-            <div className="px-2.5 py-1.5 rounded-full text-xs font-bold bg-black/40 text-[#D4AF37]">
-              {printsRemaining} {he ? 'נותרו' : 'left'}
-            </div>
-          </div>
-
-          {/* Countdown overlay */}
-          {countdown !== null && (
-            <div className="absolute inset-0 flex items-center justify-center z-30" style={{ background: 'rgba(0,0,0,0.4)' }}>
-              <span className="countdown-number">{countdown}</span>
-            </div>
-          )}
-
-          {/* Lens/zoom selector — floats above bottom controls. Big +/- buttons step
-              through the phone's available back lenses (no unreliable per-lens labels). */}
-          {facingMode === 'environment' && videoDevices.filter(d => !d.label.toLowerCase().includes('front')).length > 1 && (
-            <div className="absolute bottom-28 left-0 right-0 z-20 flex items-center justify-center gap-6">
-              {(() => {
-                const backDevices = videoDevices.filter(d => !d.label.toLowerCase().includes('front'));
-                const currentIndex = Math.max(0, backDevices.findIndex(d => d.deviceId === selectedDeviceId));
-                // Disabled during the countdown/capture (switching lenses tears
-                // down and restarts the camera stream, which would otherwise
-                // yank the frame out from under an in-progress shot) and while
-                // a previous tap's switch hasn't finished yet.
-                const disabled = countdown !== null || lensSwitching;
-                const step = (delta: number) => {
-                  if (disabled) return;
-                  const next = (currentIndex + delta + backDevices.length) % backDevices.length;
-                  setLensSwitching(true);
-                  setSelectedDeviceId(backDevices[next].deviceId);
-                };
-                return (
-                  <>
-                    <button className="zoom-btn" disabled={disabled} onClick={() => step(-1)} aria-label={he ? 'הקטן זום' : 'Zoom out'}>
-                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <path d="M5 12h14" strokeLinecap="round" />
-                      </svg>
-                    </button>
-                    <button className="zoom-btn" disabled={disabled} onClick={() => step(1)} aria-label={he ? 'הגדל זום' : 'Zoom in'}>
-                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-                      </svg>
-                    </button>
-                  </>
-                );
-              })()}
-            </div>
-          )}
-
-          {/* Bottom controls — transparent overlay */}
-          <div className="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-center gap-8 pb-10 pt-6 px-4"
-            style={{ background: 'linear-gradient(0deg, rgba(0,0,0,0.55) 0%, transparent 100%)' }}>
-            <button className="control-btn" onClick={() => { cancelTimer(); setMode('choose'); }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" /></svg>
-            </button>
-            {countdown !== null ? (
-              <button className="shutter-btn" onClick={cancelTimer} style={{ background: 'linear-gradient(135deg, #666, #888)' }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
-              </button>
-            ) : (
-              <button className="shutter-btn pulse-ring" onClick={capture}>
-                <div className="shutter-btn-inner" />
-                {timerSeconds > 0 && <span className="absolute text-black text-xs font-bold">{timerSeconds}s</span>}
-              </button>
-            )}
-            <button className="control-btn" disabled={countdown !== null} style={{ opacity: countdown !== null ? 0.4 : 1 }}
-              onClick={() => { setSelectedDeviceId(null); setFacingMode((f) => f === 'user' ? 'environment' : 'user'); }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M1 4v6h6M23 20v-6h-6" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* ===== CROP SCREEN — adjust photo in the print-lab frame ===== */}
       {mode === 'crop' && rawImage && (
         <div className="fixed inset-0 z-[999] bg-black flex flex-col" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
@@ -1085,7 +775,8 @@ export default function CapturePhotoPage() {
                 <HomeLogo size="lg" />
               </div>
 
-              <motion.button className="btn-glow w-full text-lg" whileTap={{ scale: 0.96 }} onClick={() => setMode('camera')}>
+              <motion.button className="btn-glow w-full text-lg" whileTap={{ scale: 0.96 }}
+                onClick={() => cameraInputRef.current?.click()}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <rect x="2" y="6" width="20" height="14" rx="3" />
                   <circle cx="12" cy="13" r="4" />
@@ -1093,6 +784,10 @@ export default function CapturePhotoPage() {
                 </svg>
                 {t(locale, 'takePhoto')}
               </motion.button>
+              {/* `capture="environment"` hands the shot off to the phone's own
+                  native camera app (real quality/HDR/zoom/flash, works on
+                  iPhone too) instead of our old in-app getUserMedia camera. */}
+              <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileUpload} />
 
               <motion.button className="btn-secondary w-full text-lg" whileTap={{ scale: 0.96 }}
                 onClick={() => fileInputRef.current?.click()}>
@@ -1107,7 +802,7 @@ export default function CapturePhotoPage() {
             </motion.div>
           )}
 
-          {/* Camera and captured views are rendered OUTSIDE main (above) */}
+          {/* Captured/crop views are rendered OUTSIDE main (above) */}
         </AnimatePresence>
       </main>
 
