@@ -231,6 +231,7 @@ function EventsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showQR, setShowQR] = useState<string | null>(null);
+  const [showGallery, setShowGallery] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [date, setDate] = useState('');
   const [maxPrints, setMaxPrints] = useState(5);
@@ -473,6 +474,10 @@ function EventsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
                 <Link href={`/event/${event.id}`} className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold bg-green-500/15 text-green-400 active:bg-green-500/25">
                   {he ? 'כניסה' : 'Enter'} 🚀
                 </Link>
+                <button className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold bg-pink-500/15 text-pink-400 active:bg-pink-500/25"
+                  onClick={() => setShowGallery(showGallery === event.id ? null : event.id)}>
+                  {he ? '🖼️ גלריה' : '🖼️ Gallery'}
+                </button>
                 <button className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold bg-blue-500/15 text-blue-400 active:bg-blue-500/25"
                   onClick={() => startEdit(event.id)}>{he ? 'ערוך' : 'Edit'}</button>
                 <button className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold bg-white/8 text-white/60 active:bg-white/15"
@@ -488,6 +493,21 @@ function EventsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
                     <p className="text-xs text-gray-400 mt-2 break-all select-all">
                       {typeof window !== 'undefined' ? `${window.location.origin}/event/${event.id}` : ''}
                     </p>
+                  </motion.div>
+                )}
+                {showGallery === event.id && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                    className="mt-3 p-4 bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                    <p className="text-xs text-white/50 mb-2">
+                      {he ? 'קישור לשיתוף עם האורחים — כל מי שיש לו אותו יוכל לצפות בתמונות האירוע' : "Link to share with guests — anyone with it can view this event's photos"}
+                    </p>
+                    <p className="text-xs text-primary break-all select-all">
+                      {typeof window !== 'undefined' ? api.getEventGalleryUrl(event.id) : ''}
+                    </p>
+                    <Link href={`/gallery/${event.id}`} target="_blank"
+                      className="inline-block mt-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-pink-500/15 text-pink-400">
+                      {he ? 'פתח בטאב חדש' : 'Open in new tab'} ↗
+                    </Link>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -1290,6 +1310,10 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
                             </Link>
                             <Link href={`/admin/event/${event.id}/qr`} className="shrink-0 px-2 py-1 rounded-md text-[10px] font-bold bg-purple-500/15 text-purple-400">
                               QR
+                            </Link>
+                            <Link href={`/gallery/${event.id}`} target="_blank" title={he ? 'גלריה' : 'Gallery'}
+                              className="shrink-0 px-2 py-1 rounded-md text-[10px] font-bold bg-pink-500/15 text-pink-400">
+                              🖼️
                             </Link>
                             <button onClick={() => handleToggleEventActive(event)}
                               className="shrink-0 px-1.5 py-1 rounded-md text-[10px] font-bold bg-white/8 text-white/60">

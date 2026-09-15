@@ -226,6 +226,17 @@ export const api = {
     return handleJson(res, 'Failed to delete event');
   },
 
+  // Public — powers the shareable per-event gallery page (no auth header;
+  // this is meant to be opened by guests, not just the event's own manager).
+  async getEventGallery(eventId: string) {
+    const res = await fetch(`${BASE}/api/events/${eventId}/gallery`);
+    return handleJson(res, 'Failed to load gallery');
+  },
+
+  getEventGalleryUrl(eventId: string) {
+    return `${typeof window !== 'undefined' ? window.location.origin : ''}/gallery/${eventId}`;
+  },
+
   // ===== Overlays =====
   async getOverlays(eventId?: string, full = false) {
     const params = new URLSearchParams();
