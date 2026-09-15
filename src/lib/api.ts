@@ -5,6 +5,22 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// A fresh, direct login/register/logout means there's no impersonation to
+// "return" from anymore — any impersonator-* stash left over from an
+// earlier session (the admin closed the tab, or otherwise left an
+// impersonated session without pressing "Return to admin") is now stale.
+// Without this, that leftover admin token — quietly still sitting in
+// localStorage — gets wrongly picked up the next time the "Return to
+// admin" button is pressed, days or weeks later in a totally unrelated
+// session, restoring a token that has since expired (or otherwise stopped
+// working) and bouncing the admin straight to the login page instead of
+// back to /admin — which is exactly what always made that button feel
+// broken.
+function clearStaleImpersonatorStash() {
+  localStorage.removeItem('impersonator-token');
+  localStorage.removeItem('impersonator-user');
+}
+
 /**
  * Most calls below used to just return res.json() with no res.ok check —
  * an HTTP error (404/500/etc) would silently resolve as if it succeeded,
@@ -33,6 +49,7 @@ export const api = {
     if (typeof window !== 'undefined') {
       localStorage.setItem('auth-token', data.token);
       localStorage.setItem('auth-user', JSON.stringify(data.user));
+      clearStaleImpersonatorStash();
     }
     return data;
   },
@@ -47,6 +64,7 @@ export const api = {
     if (typeof window !== 'undefined') {
       localStorage.setItem('auth-token', result.token);
       localStorage.setItem('auth-user', JSON.stringify(result.user));
+      clearStaleImpersonatorStash();
     }
     return result;
   },
@@ -61,6 +79,7 @@ export const api = {
     if (typeof window !== 'undefined') {
       localStorage.setItem('auth-token', result.token);
       localStorage.setItem('auth-user', JSON.stringify(result.user));
+      clearStaleImpersonatorStash();
     }
     return result;
   },
@@ -76,6 +95,7 @@ export const api = {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('auth-token');
       localStorage.removeItem('auth-user');
+      clearStaleImpersonatorStash();
       sessionStorage.removeItem('admin-auth');
     }
   },
