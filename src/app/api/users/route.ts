@@ -26,6 +26,45 @@ export async function GET(request: Request) {
   return NextResponse.json(users);
 }
 
+// POST /api/users — create a new account manager (super_admin only). Unlike
+// /api/auth/register (public self-signup, which logs the caller in as the
+// new account), this never returns a token — it's the admin creating an
+// account on someone else's behalf while staying logged in as themselves
+// (e.g. the "create new user" option in the New Event form's owner picker).
+export async function POST(request: Request) {
+  const currentUser = await getUserFromRequest(request);
+  if (!isSuperAdmin(currentUser)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const { email, password, name, phone, role } = await request.json();
+  if (!email || !password || !name) {
+    return NextResponse.json({ error: 'Email, password, and name are required' }, { status: 400 });
+  }
+  if (password.length < 10) {
+    return NextResponse.json({ error: 'Password must be at least 10 characters' }, { status: 400 });
+  }
+
+  const normalized = email.toLowerCase().trim();
+  const existing = await prisma.user.findUnique({ where: { email: normalized } });
+  if (existing) {
+    return NextResponse.json({ error: 'Email already in use' }, { status: 409 });
+  }
+
+  const user = await prisma.user.create({
+    data: {
+      email: normalized,
+      passwordHash: await hashPassword(password),
+      name,
+      phone: phone || '',
+      role: role === 'super_admin' ? 'super_admin' : 'account_manager',
+    },
+    select: { id: true, email: true, name: true, role: true, active: true, phone: true, createdAt: true, _count: { select: { events: true } } },
+  });
+
+  return NextResponse.json(user);
+}
+
 // PATCH /api/users — update user (super_admin only)
 export async function PATCH(request: Request) {
   const currentUser = await getUserFromRequest(request);

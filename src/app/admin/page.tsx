@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, Fragment } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Swal from '@/lib/swal';
 import { useStore } from '@/lib/store';
@@ -112,6 +112,11 @@ function useLoader() {
 }
 
 type Tab = 'events' | 'overlays' | 'photos' | 'users' | 'leads';
+
+// Sentinel <option> value for "+ Create new user" in the event owner
+// picker — kept distinct from any real user id (a cuid/uuid) or the ''
+// ("myself") option.
+const NEW_USER_VALUE = '__new__';
 
 interface AuthUser { id: string; email: string; name: string; role: string; }
 interface EventData { id: string; name: string; date: string; maxPrintsPerDevice: number; active: boolean; ownerId?: string | null; owner?: { id: string; name: string; email: string }; }
@@ -235,6 +240,16 @@ function EventsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const [loading, setLoading] = useState(true);
   const loader = useLoader();
 
+  // Inline "create a new user" sub-form, opened from the owner picker's
+  // "+ Create new user" option instead of making the admin leave this form,
+  // go create the user on the Users tab, then come back and start over.
+  const [showNewUserForm, setShowNewUserForm] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPhone, setNewUserPhone] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserErrors, setNewUserErrors] = useState<{ name?: boolean; email?: boolean; password?: boolean }>({});
+
   const loadEvents = () => {
     api.getEvents().then((data) => { setEvents(data); setLoading(false); }).catch((err) => {
       setLoading(false);
@@ -253,6 +268,21 @@ function EventsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 
   const resetForm = () => {
     setName(''); setDate(''); setMaxPrints(5); setOwnerId(''); setShowForm(false); setEditingId(null); setErrors({});
+    setShowNewUserForm(false); setNewUserName(''); setNewUserEmail(''); setNewUserPhone(''); setNewUserPassword(''); setNewUserErrors({});
+  };
+
+  const handleCreateUser = async () => {
+    const errs = { name: !newUserName.trim(), email: !newUserEmail.trim(), password: newUserPassword.length < 10 };
+    setNewUserErrors(errs);
+    if (errs.name || errs.email || errs.password) return;
+    await loader.run(he ? 'יוצר משתמש...' : 'Creating user...', async () => {
+      const user = await api.createUser({ name: newUserName, email: newUserEmail, phone: newUserPhone, password: newUserPassword });
+      setManagers((prev) => [...prev, user]);
+      setOwnerId(user.id);
+      setShowNewUserForm(false);
+      setNewUserName(''); setNewUserEmail(''); setNewUserPhone(''); setNewUserPassword(''); setNewUserErrors({});
+      Swal.fire({ icon: 'success', title: he ? `✅ המשתמש "${user.name}" נוצר` : `✅ User "${user.name}" created`, timer: 1800, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
+    });
   };
 
   const handleSave = async () => {
@@ -354,16 +384,60 @@ function EventsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
               {isSuperAdmin && (
                 <div>
                   <label className="block text-xs text-white/50 mb-1">{he ? 'מנהל האירוע (בעל התיקייה בדרופבוקס)' : 'Event manager (Dropbox owner)'}</label>
-                  <select value={ownerId} onChange={(e) => setOwnerId(e.target.value)}
+                  <select value={showNewUserForm ? NEW_USER_VALUE : ownerId}
+                    onChange={(e) => {
+                      if (e.target.value === NEW_USER_VALUE) { setShowNewUserForm(true); return; }
+                      setShowNewUserForm(false);
+                      setOwnerId(e.target.value);
+                    }}
                     className="w-full px-4 py-3 rounded-xl bg-white/8 border border-white/15 text-white focus:border-primary focus:outline-none text-base">
                     <option value="">{he ? '— אני —' : '— Myself —'}</option>
                     {managers.map((m) => (
                       <option key={m.id} value={m.id}>{m.name} ({m.email})</option>
                     ))}
+                    <option value={NEW_USER_VALUE}>{he ? '+ צור משתמש חדש' : '+ Create new user'}</option>
                   </select>
                   <p className="text-[10px] text-white/25 mt-1">
                     {he ? 'תמונות האירוע יעלו לדרופבוקס של המנהל שנבחר, אם חיבר אחד' : "Photos upload to the chosen manager's own Dropbox, if they've connected one"}
                   </p>
+
+                  {showNewUserForm && (
+                    <div className="mt-3 p-4 rounded-xl bg-white/5 border border-white/10 space-y-2.5">
+                      <p className="text-xs font-bold text-white/70">{he ? 'משתמש חדש' : 'New user'}</p>
+                      <div>
+                        <input type="text" value={newUserName}
+                          onChange={(e) => { setNewUserName(e.target.value); setNewUserErrors((p) => ({ ...p, name: false })); }}
+                          placeholder={he ? 'שם מלא *' : 'Full name *'}
+                          className={`w-full px-3 py-2.5 rounded-lg bg-white/8 border text-white placeholder-white/25 focus:outline-none text-sm ${newUserErrors.name ? 'border-red-500' : 'border-white/15 focus:border-primary'}`} />
+                      </div>
+                      <div>
+                        <input type="email" value={newUserEmail}
+                          onChange={(e) => { setNewUserEmail(e.target.value); setNewUserErrors((p) => ({ ...p, email: false })); }}
+                          placeholder={he ? 'אימייל *' : 'Email *'} dir="ltr"
+                          className={`w-full px-3 py-2.5 rounded-lg bg-white/8 border text-white placeholder-white/25 focus:outline-none text-sm ${newUserErrors.email ? 'border-red-500' : 'border-white/15 focus:border-primary'}`} />
+                      </div>
+                      <div>
+                        <input type="tel" value={newUserPhone} onChange={(e) => setNewUserPhone(e.target.value)}
+                          placeholder={he ? 'טלפון (אופציונלי)' : 'Phone (optional)'} dir="ltr"
+                          className="w-full px-3 py-2.5 rounded-lg bg-white/8 border border-white/15 text-white placeholder-white/25 focus:border-primary focus:outline-none text-sm" />
+                      </div>
+                      <div>
+                        <input type="password" value={newUserPassword}
+                          onChange={(e) => { setNewUserPassword(e.target.value); setNewUserErrors((p) => ({ ...p, password: false })); }}
+                          placeholder={he ? 'סיסמה (10+ תווים) *' : 'Password (10+ chars) *'} dir="ltr" minLength={10}
+                          className={`w-full px-3 py-2.5 rounded-lg bg-white/8 border text-white placeholder-white/25 focus:outline-none text-sm ${newUserErrors.password ? 'border-red-500' : 'border-white/15 focus:border-primary'}`} />
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <button type="button" className="btn-secondary flex-1 !py-2 !text-sm"
+                          onClick={() => { setShowNewUserForm(false); setOwnerId(''); }}>
+                          {he ? 'ביטול' : 'Cancel'}
+                        </button>
+                        <button type="button" className="btn-glow flex-1 !py-2 !text-sm" onClick={handleCreateUser}>
+                          {he ? 'צור והחל' : 'Create & use'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               <div className="flex gap-3 pt-2">
@@ -954,10 +1028,18 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
   const [errors, setErrors] = useState<{ name?: boolean; email?: boolean }>({});
   const loader = useLoader();
 
-  // Which user's actions accordion is expanded on the mobile layout — only
-  // one open at a time (tapping a row toggles it; tapping another row
-  // switches to that one).
+  // Which user's row (events + actions) is expanded — only one open at a
+  // time (tapping a row toggles it; tapping another row switches to that
+  // one).
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  // All events, grouped by owner — every event's ownerId defaults to its
+  // creating admin server-side, so this always has a real owner to group
+  // under. Loaded once here (super-admin-only tab) instead of one fetch per
+  // user, so expanding a row is instant.
+  const [events, setEvents] = useState<EventData[]>([]);
+  const loadEvents = () => { api.getEvents().then((data: EventData[]) => setEvents(data)).catch(() => {}); };
+  const eventsForUser = (userId: string) => events.filter((e) => e.ownerId === userId || e.owner?.id === userId);
 
   const loadUsers = () => {
     api.getUsers().then((data: UserData[]) => { setUsers(data); setLoading(false); }).catch((err) => {
@@ -966,7 +1048,27 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
     });
   };
 
-  useEffect(() => { loadUsers(); }, []);
+  useEffect(() => { loadUsers(); loadEvents(); }, []);
+
+  const handleToggleEventActive = async (event: EventData) => withErrorAlert(async () => {
+    await api.updateEvent(event.id, { active: !event.active });
+    setEvents((prev) => prev.map((e) => (e.id === event.id ? { ...e, active: !e.active } : e)));
+  });
+
+  const handleDeleteEvent = async (event: EventData) => {
+    const result = await Swal.fire({
+      icon: 'warning', title: he ? 'למחוק אירוע?' : 'Delete event?',
+      text: he ? `"${event.name}" וכל התמונות שלו יימחקו לצמיתות` : `"${event.name}" and all its photos will be permanently deleted`,
+      showCancelButton: true, confirmButtonColor: '#D4AF37', cancelButtonColor: '#333',
+      confirmButtonText: he ? 'מחק' : 'Delete', cancelButtonText: he ? 'ביטול' : 'Cancel',
+      background: '#0a0a0a', color: '#fff',
+    });
+    if (!result.isConfirmed) return;
+    await withErrorAlert(async () => {
+      await api.deleteEvent(event.id);
+      setEvents((prev) => prev.filter((e) => e.id !== event.id));
+    });
+  };
 
   const toggleActive = async (user: UserData) => withErrorAlert(async () => {
     await api.updateUser(user.id, { active: !user.active });
@@ -1127,10 +1229,13 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
         )}
       </AnimatePresence>
 
-      {/* Mobile: accordion — tap a row to expand its actions inline below
-          it (pushes the rest of the list down), instead of a floating menu
-          that can end up positioned oddly or clipped near screen edges. */}
-      <div className="sm:hidden glass-card overflow-hidden divide-y divide-white/5" dir={he ? 'rtl' : 'ltr'}>
+      {/* One accordion layout for every screen size — tap/click a row to
+          expand its events + actions inline below it (pushes the rest of
+          the list down), instead of a floating menu that can end up
+          positioned oddly or clipped near screen edges. Desktop used to get
+          a separate wide <table> instead, but with 8 columns that meant
+          scrolling it sideways just to see "Actions" — worse than this. */}
+      <div className="glass-card overflow-hidden divide-y divide-white/5" dir={he ? 'rtl' : 'ltr'}>
         {users.map((user) => {
           const isSelf = user.id === currentUserId;
           const rowOpen = openMenuId === user.id;
@@ -1166,6 +1271,42 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
                     initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
                     className="overflow-hidden"
                   >
+                    {/* This user's events — replaces having to cross-reference the
+                        separate flat Events tab to see what belongs to whom. */}
+                    <div className="px-3 pb-2">
+                      <p className="text-[10px] text-white/30 uppercase font-bold mb-1.5">{he ? 'אירועים' : 'Events'}</p>
+                      <div className="space-y-1.5">
+                        {eventsForUser(user.id).map((event) => (
+                          <div key={event.id} className="flex items-center gap-2 bg-white/5 rounded-lg px-2.5 py-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="text-white text-xs font-bold truncate">{event.name}</div>
+                              <div className="text-white/40 text-[10px]">{event.date.replace(/-/g, '.')}</div>
+                            </div>
+                            <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-bold ${event.active ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
+                              {event.active ? (he ? 'פעיל' : 'On') : (he ? 'כבוי' : 'Off')}
+                            </span>
+                            <Link href={`/event/${event.id}`} className="shrink-0 px-2 py-1 rounded-md text-[10px] font-bold bg-green-500/15 text-green-400">
+                              {he ? 'כניסה' : 'Enter'}
+                            </Link>
+                            <Link href={`/admin/event/${event.id}/qr`} className="shrink-0 px-2 py-1 rounded-md text-[10px] font-bold bg-purple-500/15 text-purple-400">
+                              QR
+                            </Link>
+                            <button onClick={() => handleToggleEventActive(event)}
+                              className="shrink-0 px-1.5 py-1 rounded-md text-[10px] font-bold bg-white/8 text-white/60">
+                              {event.active ? '⏸' : '▶️'}
+                            </button>
+                            <button onClick={() => handleDeleteEvent(event)}
+                              className="shrink-0 px-1.5 py-1 rounded-md text-[10px] font-bold bg-red-500/15 text-red-400">
+                              🗑️
+                            </button>
+                          </div>
+                        ))}
+                        {eventsForUser(user.id).length === 0 && (
+                          <p className="text-white/25 text-xs py-1">{he ? 'אין אירועים למשתמש זה' : 'No events for this user'}</p>
+                        )}
+                      </div>
+                    </div>
+
                     <div className="px-3 pb-3 flex flex-wrap gap-2">
                       <button onClick={() => { startEdit(user); setOpenMenuId(null); }}
                         className="px-3 py-2 rounded-lg text-xs font-bold bg-blue-500/15 text-blue-400">
@@ -1206,82 +1347,6 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
         )}
       </div>
 
-      {/* Tablet/desktop: full table */}
-      <div className="hidden sm:block glass-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm" dir={he ? 'rtl' : 'ltr'}>
-            <thead>
-              <tr className="border-b border-white/10 text-white/40 text-xs uppercase">
-                <th className="text-start px-3 py-2.5 font-medium">{he ? 'שם' : 'Name'}</th>
-                <th className="text-start px-3 py-2.5 font-medium">{he ? 'אימייל' : 'Email'}</th>
-                <th className="text-start px-3 py-2.5 font-medium">{he ? 'טלפון' : 'Phone'}</th>
-                <th className="text-start px-3 py-2.5 font-medium">{he ? 'תפקיד' : 'Role'}</th>
-                <th className="text-start px-3 py-2.5 font-medium">{he ? 'סטטוס' : 'Status'}</th>
-                <th className="text-start px-3 py-2.5 font-medium">{he ? 'אירועים' : 'Events'}</th>
-                <th className="text-start px-3 py-2.5 font-medium">{he ? 'נרשם' : 'Joined'}</th>
-                <th className="text-start px-3 py-2.5 font-medium">{he ? 'פעולות' : 'Actions'}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((user) => {
-                const isSelf = user.id === currentUserId;
-                return (
-                  <tr key={user.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03] align-middle">
-                    <td className="px-3 py-3 text-white font-bold whitespace-nowrap">
-                      {user.name}{isSelf && <span className="text-white/30 font-normal"> ({he ? 'אתה' : 'you'})</span>}
-                    </td>
-                    <td className="px-3 py-3 text-white/60 whitespace-nowrap" dir="ltr">{user.email}</td>
-                    <td className="px-3 py-3 text-white/60 whitespace-nowrap" dir="ltr">{user.phone || '—'}</td>
-                    <td className="px-3 py-3 whitespace-nowrap">
-                      <button onClick={() => toggleRole(user)}
-                        className={`text-xs px-2 py-0.5 rounded-full font-bold transition-colors ${
-                          user.role === 'super_admin' ? 'bg-primary/20 text-[#D4AF37] hover:bg-primary/30' : 'bg-white/8 text-white/50 hover:bg-white/15'
-                        }`} title={he ? 'לחץ להחלפת תפקיד' : 'Click to switch role'}>
-                        {user.role === 'super_admin' ? (he ? 'מנהל אתר' : 'Super Admin') : (he ? 'מנהל חשבון' : 'Account Mgr')}
-                      </button>
-                    </td>
-                    <td className="px-3 py-3 whitespace-nowrap">
-                      <button onClick={() => toggleActive(user)}
-                        className={`flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full ${user.active ? 'text-green-400 hover:bg-green-500/10' : 'text-red-400 hover:bg-red-500/10'}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${user.active ? 'bg-green-500' : 'bg-red-500'}`} />
-                        {user.active ? (he ? 'פעיל' : 'Active') : (he ? 'מושבת' : 'Disabled')}
-                      </button>
-                    </td>
-                    <td className="px-3 py-3 text-white/50 whitespace-nowrap">{user._count.events}</td>
-                    <td className="px-3 py-3 text-white/40 whitespace-nowrap">{new Date(user.createdAt).toLocaleDateString()}</td>
-                    <td className="px-3 py-3 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5">
-                        <button onClick={() => startEdit(user)} title={he ? 'ערוך' : 'Edit'}
-                          className="px-2 py-1 rounded-lg text-xs font-bold bg-blue-500/15 text-blue-400 hover:bg-blue-500/25">
-                          {he ? 'ערוך' : 'Edit'}
-                        </button>
-                        <button onClick={() => handleLoginAs(user)} title={he ? 'היכנס לחשבון' : 'Log in as'}
-                          className="px-2 py-1 rounded-lg text-xs font-bold bg-purple-500/15 text-purple-400 hover:bg-purple-500/25">
-                          {he ? 'כניסה' : 'Login as'}
-                        </button>
-                        <button onClick={() => handleLoginAsDropbox(user)} title={he ? 'חיבור Dropbox' : 'Connect Dropbox'}
-                          className="px-2 py-1 rounded-lg text-xs font-bold bg-sky-500/15 text-sky-400 hover:bg-sky-500/25">
-                          {he ? '📦 Dropbox' : '📦 Dropbox'}
-                        </button>
-                        <button onClick={() => handleDelete(user)} title={he ? 'מחק' : 'Delete'}
-                          className="px-2 py-1 rounded-lg text-xs font-bold bg-red-500/15 text-red-400 hover:bg-red-500/25">
-                          🗑️
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {users.length === 0 && (
-          <div className="text-center py-8 text-white/30 text-sm">
-            {he ? 'אין משתמשים רשומים' : 'No registered users'}
-          </div>
-        )}
-      </div>
     </motion.div>
   );
 }

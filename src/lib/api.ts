@@ -117,6 +117,19 @@ export const api = {
     return handleJson(res, 'Failed to load users');
   },
 
+  // Admin-created user — unlike register()/login(), this never touches the
+  // caller's own auth-token/auth-user, since it's the super admin creating
+  // an account on someone else's behalf while staying logged in as
+  // themselves (e.g. "create new user" inline in the New Event form).
+  async createUser(data: { email: string; password: string; name: string; phone?: string; role?: 'account_manager' | 'super_admin' }) {
+    const res = await fetch(`${BASE}/api/users`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(data),
+    });
+    return handleJson(res, 'Failed to create user');
+  },
+
   async updateUser(id: string, data: Record<string, unknown>) {
     const res = await fetch(`${BASE}/api/users`, {
       method: 'PATCH',
