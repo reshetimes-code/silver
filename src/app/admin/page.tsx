@@ -211,7 +211,7 @@ export default function AdminPage() {
       </div>
       <div className="relative z-10 px-4 pb-24 pt-4 max-w-3xl mx-auto">
         <AnimatePresence mode="wait">
-          {tab === 'events' && <EventsTab key="events" isSuperAdmin={isSuperAdmin} />}
+          {tab === 'events' && <EventsTab key="events" isSuperAdmin={isSuperAdmin} currentUserId={currentUser?.id} />}
           {tab === 'overlays' && <OverlaysTab key="overlays" />}
           {tab === 'photos' && <PhotosTab key="photos" />}
           {tab === 'leads' && <LeadsTab key="leads" />}
@@ -386,7 +386,7 @@ function EventFormPanel({
   );
 }
 
-function EventsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
+function EventsTab({ isSuperAdmin, currentUserId }: { isSuperAdmin: boolean; currentUserId?: string }) {
   const { locale, showLanguageToggle, setShowLanguageToggle } = useStore();
   const he = locale === 'he';
   const [events, setEvents] = useState<EventData[]>([]);
@@ -435,6 +435,35 @@ function EventsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
       await api.updateEvent(id, { active: !active });
       loadEvents();
       Swal.fire({ icon: 'success', title: !active ? (he ? '✅ האירוע הופעל' : '✅ Event activated') : (he ? '⏸ האירוע כובה' : '⏸ Event deactivated'), timer: 1500, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
+    });
+  };
+
+  // "כניסה"/Enter opens /event/[id] — the guest-facing capture flow, for
+  // previewing what a guest sees when they scan this event's QR code. This
+  // is a separate thing: jump straight to the event *owner's own* dashboard
+  // (their "My Events" home with the sidebar menu), the same place "Login
+  // as" on the Users tab lands on — without needing to go find that user
+  // there first. A no-op (with a heads-up) for an event with no distinct
+  // owner (self-owned, or legacy data with no owner at all).
+  const handleViewOwnerDashboard = async (event: EventData) => {
+    if (!event.owner || event.owner.id === currentUserId) {
+      // eslint-disable-next-line react-hooks/immutability -- same window.location.href pattern as handleLoginAs/handleLoginAsDropbox below, which this rule doesn't flag; a false positive here.
+      window.location.href = '/dashboard';
+      return;
+    }
+    const owner = event.owner;
+    const result = await Swal.fire({
+      icon: 'question',
+      title: he ? `להיכנס לחשבון של ${owner.name}?` : `Log in as ${owner.name}?`,
+      text: he ? 'תעבור לצפות במערכת בדיוק כפי שהוא רואה אותה. תוכל לחזור לניהול בכל רגע.' : "You'll switch to viewing the app exactly as they see it. You can return to admin anytime.",
+      showCancelButton: true, confirmButtonColor: '#D4AF37', cancelButtonColor: '#333',
+      confirmButtonText: he ? 'היכנס' : 'Log in', cancelButtonText: he ? 'ביטול' : 'Cancel',
+      background: '#0a0a0a', color: '#fff',
+    });
+    if (!result.isConfirmed) return;
+    await withErrorAlert(async () => {
+      await api.loginAsUser(owner.id);
+      window.location.href = '/dashboard';
     });
   };
 
@@ -503,6 +532,12 @@ function EventsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
                 <Link href={`/event/${event.id}`} className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold bg-green-500/15 text-green-400 active:bg-green-500/25">
                   {he ? 'כניסה' : 'Enter'} 🚀
                 </Link>
+                {isSuperAdmin && (
+                  <button className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold bg-amber-500/15 text-amber-400 active:bg-amber-500/25"
+                    onClick={() => handleViewOwnerDashboard(event)} title={he ? 'לוח הבקרה של הבעלים' : "Owner's dashboard"}>
+                    {he ? '🏠 לוח בקרה' : '🏠 Dashboard'}
+                  </button>
+                )}
                 <button className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold bg-pink-500/15 text-pink-400 active:bg-pink-500/25"
                   onClick={() => setShowGallery(showGallery === event.id ? null : event.id)}>
                   {he ? '🖼️ גלריה' : '🖼️ Gallery'}
@@ -1359,6 +1394,10 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
                             <Link href={`/event/${event.id}`} className="shrink-0 px-2 py-1 rounded-md text-[10px] font-bold bg-green-500/15 text-green-400">
                               {he ? 'כניסה' : 'Enter'}
                             </Link>
+                            <button onClick={() => handleLoginAs(user)} title={he ? 'לוח הבקרה של הבעלים' : "Owner's dashboard"}
+                              className="shrink-0 px-2 py-1 rounded-md text-[10px] font-bold bg-amber-500/15 text-amber-400">
+                              🏠
+                            </button>
                             <Link href={`/admin/event/${event.id}/qr`} className="shrink-0 px-2 py-1 rounded-md text-[10px] font-bold bg-purple-500/15 text-purple-400">
                               QR
                             </Link>
