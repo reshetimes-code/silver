@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { api } from '@/lib/api';
+import Swal from '@/lib/swal';
 
 /**
  * Fixed top bar shown on every page while a super admin is "logged in as"
@@ -17,6 +18,7 @@ export default function ImpersonationBanner() {
   const he = locale === 'he';
   const [impersonating, setImpersonating] = useState(false);
   const [name, setName] = useState('');
+  const [returning, setReturning] = useState(false);
 
   useEffect(() => {
     const check = () => {
@@ -39,21 +41,32 @@ export default function ImpersonationBanner() {
 
   if (!impersonating) return null;
 
-  const handleReturn = () => {
-    if (api.returnToAdmin()) {
+  const handleReturn = async () => {
+    if (returning) return;
+    setReturning(true);
+    const result = await api.returnToAdmin();
+    if (result === 'restored') {
       window.location.href = '/admin';
       return;
     }
-    // The stashed admin session is missing (cleared storage, an old/odd
-    // state, etc.) — previously this just did nothing, which looked like a
-    // dead button. There's no session left to safely return to, so send
-    // them to log back in rather than leave them stuck on someone else's
-    // account with no way out.
-    localStorage.removeItem('auth-token');
-    localStorage.removeItem('auth-user');
-    localStorage.removeItem('impersonator-token');
-    localStorage.removeItem('impersonator-user');
-    window.location.href = '/login';
+    // Neither 'none' nor 'expired' touches the current (impersonated)
+    // session — it's a real, working login right there, so there's no
+    // reason to force the admin out of the app over a stash that was
+    // missing or stale. Just tell them plainly instead.
+    setReturning(false);
+    setImpersonating(api.isImpersonating());
+    Swal.fire({
+      icon: 'info',
+      title: result === 'expired'
+        ? (he ? 'הפעלת הניהול המקורית פגה' : 'Your original admin session expired')
+        : (he ? 'לא נמצאה הפעלת ניהול לחזרה' : 'No admin session found to return to'),
+      text: he
+        ? 'תוכל להתחבר מחדש כמנהל, או להמשיך להשתמש בחשבון הנוכחי.'
+        : 'You can log in again as an admin, or keep using this account.',
+      confirmButtonColor: '#D4AF37',
+      background: '#0a0a0a',
+      color: '#fff',
+    });
   };
 
   return (
@@ -66,9 +79,10 @@ export default function ImpersonationBanner() {
       </span>
       <button
         onClick={handleReturn}
-        className="px-3 py-1 rounded-full bg-black/80 text-[#D4AF37] active:scale-95 transition-transform"
+        disabled={returning}
+        className="px-3 py-1 rounded-full bg-black/80 text-[#D4AF37] active:scale-95 transition-transform disabled:opacity-60"
       >
-        {he ? '↩ חזרה לניהול' : '↩ Return to admin'}
+        {returning ? (he ? '...בודק' : 'Checking...') : (he ? '↩ חזרה לניהול' : '↩ Return to admin')}
       </button>
     </div>
   );

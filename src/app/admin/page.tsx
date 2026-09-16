@@ -1394,10 +1394,6 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
                             <Link href={`/event/${event.id}`} className="shrink-0 px-2 py-1 rounded-md text-[10px] font-bold bg-green-500/15 text-green-400">
                               {he ? 'כניסה' : 'Enter'}
                             </Link>
-                            <button onClick={() => handleLoginAs(user)} title={he ? 'לוח הבקרה של הבעלים' : "Owner's dashboard"}
-                              className="shrink-0 px-2 py-1 rounded-md text-[10px] font-bold bg-amber-500/15 text-amber-400">
-                              🏠
-                            </button>
                             <Link href={`/admin/event/${event.id}/qr`} className="shrink-0 px-2 py-1 rounded-md text-[10px] font-bold bg-purple-500/15 text-purple-400">
                               QR
                             </Link>
@@ -1405,6 +1401,13 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
                               className="shrink-0 px-2 py-1 rounded-md text-[10px] font-bold bg-pink-500/15 text-pink-400">
                               🖼️
                             </Link>
+                            {/* Kept apart from "Enter" above (not adjacent) — icon-only
+                                buttons this small sitting right next to each other in a
+                                dense row are too easy to mis-tap for one another. */}
+                            <button onClick={() => handleLoginAs(user)} title={he ? 'לוח הבקרה של הבעלים' : "Owner's dashboard"}
+                              className="shrink-0 px-2 py-1 rounded-md text-[10px] font-bold bg-amber-500/15 text-amber-400">
+                              🏠
+                            </button>
                             <button onClick={() => handleToggleEventActive(event)}
                               className="shrink-0 px-1.5 py-1 rounded-md text-[10px] font-bold bg-white/8 text-white/60">
                               {event.active ? '⏸' : '▶️'}

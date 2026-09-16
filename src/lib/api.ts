@@ -5,21 +5,15 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-// A fresh, direct login/register/logout means there's no impersonation to
-// "return" from anymore — any impersonator-* stash left over from an
-// earlier session (the admin closed the tab, or otherwise left an
-// impersonated session without pressing "Return to admin") is now stale.
-// Without this, that leftover admin token — quietly still sitting in
-// localStorage — gets wrongly picked up the next time the "Return to
-// admin" button is pressed, days or weeks later in a totally unrelated
-// session, restoring a token that has since expired (or otherwise stopped
-// working) and bouncing the admin straight to the login page instead of
-// back to /admin — which is exactly what always made that button feel
-// broken.
-function clearStaleImpersonatorStash() {
-  localStorage.removeItem('impersonator-token');
-  localStorage.removeItem('impersonator-user');
-}
+// NOTE: an earlier version of this file cleared the impersonator-* stash on
+// every fresh login/register/logout, meant to stop a stale leftover admin
+// token from being wrongly restored later. Removed: auth-token/auth-user/
+// impersonator-* live in localStorage, which is shared across every tab on
+// this origin — a fresh login in one tab was silently deleting the stash a
+// *different* tab's still-active impersonation session depended on to
+// return properly. returnToAdmin() below now validates the stashed token
+// live instead, which handles real staleness without that cross-tab
+// side effect.
 
 /**
  * Most calls below used to just return res.json() with no res.ok check —
@@ -49,7 +43,6 @@ export const api = {
     if (typeof window !== 'undefined') {
       localStorage.setItem('auth-token', data.token);
       localStorage.setItem('auth-user', JSON.stringify(data.user));
-      clearStaleImpersonatorStash();
     }
     return data;
   },
@@ -64,7 +57,6 @@ export const api = {
     if (typeof window !== 'undefined') {
       localStorage.setItem('auth-token', result.token);
       localStorage.setItem('auth-user', JSON.stringify(result.user));
-      clearStaleImpersonatorStash();
     }
     return result;
   },
@@ -79,7 +71,6 @@ export const api = {
     if (typeof window !== 'undefined') {
       localStorage.setItem('auth-token', result.token);
       localStorage.setItem('auth-user', JSON.stringify(result.user));
-      clearStaleImpersonatorStash();
     }
     return result;
   },
@@ -95,7 +86,6 @@ export const api = {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('auth-token');
       localStorage.removeItem('auth-user');
-      clearStaleImpersonatorStash();
       sessionStorage.removeItem('admin-auth');
     }
   },
@@ -181,18 +171,37 @@ export const api = {
     return !!localStorage.getItem('impersonator-token');
   },
 
-  // Restores the stashed admin session. Returns false (and changes nothing)
-  // if there was nothing to return to.
-  returnToAdmin(): boolean {
-    if (typeof window === 'undefined') return false;
+  // Restores the stashed admin session — but only after confirming it still
+  // actually works, rather than trusting it blindly. A stash can go stale
+  // (the admin's original token expired, or their account was disabled/
+  // deleted, since it was set aside — possibly days or weeks earlier) and
+  // restoring a dead token just moves the failure from here to whatever the
+  // admin does next. Never touches the *current* (impersonated) session on
+  // failure — there's a real, working session right there; nuking it just
+  // because there was nothing (or nothing valid) to return to would force a
+  // fresh login for no reason.
+  //   'restored' — auth-token/auth-user now hold the original admin session.
+  //   'none'     — nothing was stashed; current session left untouched.
+  //   'expired'  — something was stashed but no longer authenticates; that
+  //                stale stash is cleared, current session still untouched.
+  async returnToAdmin(): Promise<'restored' | 'none' | 'expired'> {
+    if (typeof window === 'undefined') return 'none';
     const token = localStorage.getItem('impersonator-token');
     const user = localStorage.getItem('impersonator-user');
-    if (!token || !user) return false;
+    if (!token || !user) return 'none';
+
+    const res = await fetch(`${BASE}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) {
+      localStorage.removeItem('impersonator-token');
+      localStorage.removeItem('impersonator-user');
+      return 'expired';
+    }
+
     localStorage.setItem('auth-token', token);
     localStorage.setItem('auth-user', user);
     localStorage.removeItem('impersonator-token');
     localStorage.removeItem('impersonator-user');
-    return true;
+    return 'restored';
   },
 
   // ===== Events =====
