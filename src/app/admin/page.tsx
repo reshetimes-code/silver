@@ -224,22 +224,34 @@ export default function AdminPage() {
 }
 
 // ===================== EVENTS TAB =====================
-function EventsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
-  const { locale, showLanguageToggle, setShowLanguageToggle } = useStore();
+// The "New Event"/"Edit Event" form — including the super-admin-only owner
+// picker and its inline "create new user" sub-form — extracted out of
+// EventsTab so the exact same panel can also be opened from the Users tab
+// (see UsersTab below): creating an event and assigning/creating its owner
+// shouldn't only be reachable from the flat Events list.
+function EventFormPanel({
+  isSuperAdmin,
+  editingEvent,
+  managers,
+  onUserCreated,
+  onSaved,
+  onCancel,
+}: {
+  isSuperAdmin: boolean;
+  editingEvent: EventData | null;
+  managers: UserData[];
+  onUserCreated: (user: UserData) => void;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const { locale } = useStore();
   const he = locale === 'he';
-  const [events, setEvents] = useState<EventData[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [showQR, setShowQR] = useState<string | null>(null);
-  const [showGallery, setShowGallery] = useState<string | null>(null);
-  const [name, setName] = useState('');
-  const [date, setDate] = useState('');
-  const [maxPrints, setMaxPrints] = useState(5);
-  const [ownerId, setOwnerId] = useState(''); // '' = myself (the creating super admin)
-  const [managers, setManagers] = useState<UserData[]>([]);
-  const [errors, setErrors] = useState<{ name?: boolean; date?: boolean }>({});
-  const [loading, setLoading] = useState(true);
   const loader = useLoader();
+  const [name, setName] = useState(editingEvent?.name || '');
+  const [date, setDate] = useState(editingEvent?.date || '');
+  const [maxPrints, setMaxPrints] = useState(editingEvent?.maxPrintsPerDevice || 5);
+  const [ownerId, setOwnerId] = useState(editingEvent?.owner?.id || ''); // '' = myself (the creating super admin)
+  const [errors, setErrors] = useState<{ name?: boolean; date?: boolean }>({});
 
   // Inline "create a new user" sub-form, opened from the owner picker's
   // "+ Create new user" option instead of making the admin leave this form,
@@ -250,6 +262,141 @@ function EventsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const [newUserPhone, setNewUserPhone] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserErrors, setNewUserErrors] = useState<{ name?: boolean; email?: boolean; password?: boolean }>({});
+
+  const handleCreateUser = async () => {
+    const errs = { name: !newUserName.trim(), email: !newUserEmail.trim(), password: newUserPassword.length < 10 };
+    setNewUserErrors(errs);
+    if (errs.name || errs.email || errs.password) return;
+    await loader.run(he ? 'יוצר משתמש...' : 'Creating user...', async () => {
+      const user = await api.createUser({ name: newUserName, email: newUserEmail, phone: newUserPhone, password: newUserPassword });
+      onUserCreated(user);
+      setOwnerId(user.id);
+      setShowNewUserForm(false);
+      setNewUserName(''); setNewUserEmail(''); setNewUserPhone(''); setNewUserPassword(''); setNewUserErrors({});
+      Swal.fire({ icon: 'success', title: he ? `✅ המשתמש "${user.name}" נוצר` : `✅ User "${user.name}" created`, timer: 1800, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
+    });
+  };
+
+  const handleSave = async () => {
+    const errs = { name: !name.trim(), date: !date };
+    setErrors(errs);
+    if (errs.name || errs.date) {
+      Swal.fire({ icon: 'warning', title: he ? 'שדות חסרים' : 'Missing Fields', text: he ? 'נא למלא שם אירוע ותאריך' : 'Please fill in event name and date', background: '#0a0a0a', color: '#fff', confirmButtonColor: '#D4AF37' });
+      return;
+    }
+    await loader.run(editingEvent ? (he ? 'שומר שינויים...' : 'Saving changes...') : (he ? 'יוצר אירוע...' : 'Creating event...'), async () => {
+      const ownerData = isSuperAdmin && ownerId ? { ownerId } : {};
+      if (editingEvent) {
+        await api.updateEvent(editingEvent.id, { name, date, maxPrintsPerDevice: maxPrints, ...ownerData });
+      } else {
+        await api.createEvent({ name, date, maxPrintsPerDevice: maxPrints, ...ownerData });
+      }
+      onSaved();
+      Swal.fire({ icon: 'success', title: he ? '✅ נשמר בהצלחה!' : '✅ Saved!', text: editingEvent ? (he ? 'האירוע עודכן' : 'Event updated') : (he ? `האירוע "${name}" נוצר` : `Event "${name}" created`), timer: 2000, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
+    });
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+      className="glass-card p-5 mb-5 overflow-hidden">
+      {loader.visible && loader.message && <BrandedLoader message={loader.message} />}
+      <h3 className="text-lg font-bold text-white mb-4">{editingEvent ? (he ? 'ערוך אירוע' : 'Edit Event') : (he ? 'אירוע חדש' : 'New Event')}</h3>
+      <div className="space-y-3">
+        <div>
+          <label className={`block text-xs mb-1 ${errors.name ? 'text-red-400' : 'text-white/50'}`}>{he ? 'שם האירוע' : 'Event Name'} *</label>
+          <input type="text" value={name} onChange={(e) => { setName(e.target.value); setErrors((p) => ({ ...p, name: false })); }}
+            className={`w-full px-4 py-3 rounded-xl bg-white/8 border text-white placeholder-white/25 focus:outline-none text-base ${errors.name ? 'border-red-500' : 'border-white/15 focus:border-primary'}`}
+            placeholder={he ? 'בר מצווה, Sweet 16...' : 'Bar Mitzvah, Sweet 16...'} />
+        </div>
+        <div>
+          <label className={`block text-xs mb-1 ${errors.date ? 'text-red-400' : 'text-white/50'}`}>{he ? 'תאריך' : 'Date'} *</label>
+          <input type="date" value={date} onChange={(e) => { setDate(e.target.value); setErrors((p) => ({ ...p, date: false })); }}
+            className={`w-full px-4 py-3 rounded-xl bg-white/8 border text-white focus:outline-none text-base ${errors.date ? 'border-red-500' : 'border-white/15 focus:border-primary'}`} />
+        </div>
+        <div>
+          <label className="block text-xs text-white/50 mb-1">{he ? 'מקסימום הדפסות' : 'Max Prints'}</label>
+          <input type="number" value={maxPrints} onChange={(e) => setMaxPrints(parseInt(e.target.value) || 1)} min={1} max={50}
+            className="w-full px-4 py-3 rounded-xl bg-white/8 border border-white/15 text-white focus:border-primary focus:outline-none text-base" />
+        </div>
+        {isSuperAdmin && (
+          <div>
+            <label className="block text-xs text-white/50 mb-1">{he ? 'מנהל האירוע (בעל התיקייה בדרופבוקס)' : 'Event manager (Dropbox owner)'}</label>
+            <select value={showNewUserForm ? NEW_USER_VALUE : ownerId}
+              onChange={(e) => {
+                if (e.target.value === NEW_USER_VALUE) { setShowNewUserForm(true); return; }
+                setShowNewUserForm(false);
+                setOwnerId(e.target.value);
+              }}
+              className="w-full px-4 py-3 rounded-xl bg-white/8 border border-white/15 text-white focus:border-primary focus:outline-none text-base">
+              <option value="">{he ? '— אני —' : '— Myself —'}</option>
+              {managers.map((m) => (
+                <option key={m.id} value={m.id}>{m.name} ({m.email})</option>
+              ))}
+              <option value={NEW_USER_VALUE}>{he ? '+ צור משתמש חדש' : '+ Create new user'}</option>
+            </select>
+            <p className="text-[10px] text-white/25 mt-1">
+              {he ? 'תמונות האירוע יעלו לדרופבוקס של המנהל שנבחר, אם חיבר אחד' : "Photos upload to the chosen manager's own Dropbox, if they've connected one"}
+            </p>
+
+            {showNewUserForm && (
+              <div className="mt-3 p-4 rounded-xl bg-white/5 border border-white/10 space-y-2.5">
+                <p className="text-xs font-bold text-white/70">{he ? 'משתמש חדש' : 'New user'}</p>
+                <div>
+                  <input type="text" value={newUserName}
+                    onChange={(e) => { setNewUserName(e.target.value); setNewUserErrors((p) => ({ ...p, name: false })); }}
+                    placeholder={he ? 'שם מלא *' : 'Full name *'}
+                    className={`w-full px-3 py-2.5 rounded-lg bg-white/8 border text-white placeholder-white/25 focus:outline-none text-sm ${newUserErrors.name ? 'border-red-500' : 'border-white/15 focus:border-primary'}`} />
+                </div>
+                <div>
+                  <input type="email" value={newUserEmail}
+                    onChange={(e) => { setNewUserEmail(e.target.value); setNewUserErrors((p) => ({ ...p, email: false })); }}
+                    placeholder={he ? 'אימייל *' : 'Email *'} dir="ltr"
+                    className={`w-full px-3 py-2.5 rounded-lg bg-white/8 border text-white placeholder-white/25 focus:outline-none text-sm ${newUserErrors.email ? 'border-red-500' : 'border-white/15 focus:border-primary'}`} />
+                </div>
+                <div>
+                  <input type="tel" value={newUserPhone} onChange={(e) => setNewUserPhone(e.target.value)}
+                    placeholder={he ? 'טלפון (אופציונלי)' : 'Phone (optional)'} dir="ltr"
+                    className="w-full px-3 py-2.5 rounded-lg bg-white/8 border border-white/15 text-white placeholder-white/25 focus:border-primary focus:outline-none text-sm" />
+                </div>
+                <div>
+                  <input type="password" value={newUserPassword}
+                    onChange={(e) => { setNewUserPassword(e.target.value); setNewUserErrors((p) => ({ ...p, password: false })); }}
+                    placeholder={he ? 'סיסמה (10+ תווים) *' : 'Password (10+ chars) *'} dir="ltr" minLength={10}
+                    className={`w-full px-3 py-2.5 rounded-lg bg-white/8 border text-white placeholder-white/25 focus:outline-none text-sm ${newUserErrors.password ? 'border-red-500' : 'border-white/15 focus:border-primary'}`} />
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button type="button" className="btn-secondary flex-1 !py-2 !text-sm"
+                    onClick={() => { setShowNewUserForm(false); setOwnerId(''); }}>
+                    {he ? 'ביטול' : 'Cancel'}
+                  </button>
+                  <button type="button" className="btn-glow flex-1 !py-2 !text-sm" onClick={handleCreateUser}>
+                    {he ? 'צור והחל' : 'Create & use'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        <div className="flex gap-3 pt-2">
+          <button className="btn-secondary flex-1" onClick={onCancel}>{he ? 'ביטול' : 'Cancel'}</button>
+          <button className="btn-glow flex-1" onClick={handleSave}>{he ? 'שמור' : 'Save'}</button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function EventsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
+  const { locale, showLanguageToggle, setShowLanguageToggle } = useStore();
+  const he = locale === 'he';
+  const [events, setEvents] = useState<EventData[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<EventData | null>(null);
+  const [showQR, setShowQR] = useState<string | null>(null);
+  const [showGallery, setShowGallery] = useState<string | null>(null);
+  const [managers, setManagers] = useState<UserData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const loader = useLoader();
 
   const loadEvents = () => {
     api.getEvents().then((data) => { setEvents(data); setLoading(false); }).catch((err) => {
@@ -267,50 +414,9 @@ function EventsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
     api.getUsers().then((data: UserData[]) => setManagers(data.filter((u) => u.role === 'account_manager'))).catch(() => {});
   }, [isSuperAdmin]);
 
-  const resetForm = () => {
-    setName(''); setDate(''); setMaxPrints(5); setOwnerId(''); setShowForm(false); setEditingId(null); setErrors({});
-    setShowNewUserForm(false); setNewUserName(''); setNewUserEmail(''); setNewUserPhone(''); setNewUserPassword(''); setNewUserErrors({});
-  };
-
-  const handleCreateUser = async () => {
-    const errs = { name: !newUserName.trim(), email: !newUserEmail.trim(), password: newUserPassword.length < 10 };
-    setNewUserErrors(errs);
-    if (errs.name || errs.email || errs.password) return;
-    await loader.run(he ? 'יוצר משתמש...' : 'Creating user...', async () => {
-      const user = await api.createUser({ name: newUserName, email: newUserEmail, phone: newUserPhone, password: newUserPassword });
-      setManagers((prev) => [...prev, user]);
-      setOwnerId(user.id);
-      setShowNewUserForm(false);
-      setNewUserName(''); setNewUserEmail(''); setNewUserPhone(''); setNewUserPassword(''); setNewUserErrors({});
-      Swal.fire({ icon: 'success', title: he ? `✅ המשתמש "${user.name}" נוצר` : `✅ User "${user.name}" created`, timer: 1800, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
-    });
-  };
-
-  const handleSave = async () => {
-    const errs = { name: !name.trim(), date: !date };
-    setErrors(errs);
-    if (errs.name || errs.date) {
-      Swal.fire({ icon: 'warning', title: he ? 'שדות חסרים' : 'Missing Fields', text: he ? 'נא למלא שם אירוע ותאריך' : 'Please fill in event name and date', background: '#0a0a0a', color: '#fff', confirmButtonColor: '#D4AF37' });
-      return;
-    }
-    await loader.run(editingId ? (he ? 'שומר שינויים...' : 'Saving changes...') : (he ? 'יוצר אירוע...' : 'Creating event...'), async () => {
-      const ownerData = isSuperAdmin && ownerId ? { ownerId } : {};
-      if (editingId) {
-        await api.updateEvent(editingId, { name, date, maxPrintsPerDevice: maxPrints, ...ownerData });
-      } else {
-        await api.createEvent({ name, date, maxPrintsPerDevice: maxPrints, ...ownerData });
-      }
-      resetForm();
-      loadEvents();
-      Swal.fire({ icon: 'success', title: he ? '✅ נשמר בהצלחה!' : '✅ Saved!', text: editingId ? (he ? 'האירוע עודכן' : 'Event updated') : (he ? `האירוע "${name}" נוצר` : `Event "${name}" created`), timer: 2000, showConfirmButton: false, background: '#0a0a0a', color: '#fff' });
-    });
-  };
-
-  const startEdit = (id: string) => {
-    const ev = events.find((e) => e.id === id);
-    if (!ev) return;
-    setName(ev.name); setDate(ev.date); setMaxPrints(ev.maxPrintsPerDevice); setOwnerId(ev.owner?.id || '');
-    setEditingId(id); setShowForm(true);
+  const startEdit = (event: EventData) => {
+    setEditingEvent(event);
+    setShowForm(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -356,97 +462,20 @@ function EventsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
         </button>
       </div>
 
-      <button className="btn-glow w-full mb-5" onClick={() => { resetForm(); setShowForm(true); }}>
+      <button className="btn-glow w-full mb-5" onClick={() => { setEditingEvent(null); setShowForm(true); }}>
         + {he ? 'אירוע חדש' : 'New Event'}
       </button>
 
       <AnimatePresence>
         {showForm && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-            className="glass-card p-5 mb-5 overflow-hidden">
-            <h3 className="text-lg font-bold text-white mb-4">{editingId ? (he ? 'ערוך אירוע' : 'Edit Event') : (he ? 'אירוע חדש' : 'New Event')}</h3>
-            <div className="space-y-3">
-              <div>
-                <label className={`block text-xs mb-1 ${errors.name ? 'text-red-400' : 'text-white/50'}`}>{he ? 'שם האירוע' : 'Event Name'} *</label>
-                <input type="text" value={name} onChange={(e) => { setName(e.target.value); setErrors((p) => ({ ...p, name: false })); }}
-                  className={`w-full px-4 py-3 rounded-xl bg-white/8 border text-white placeholder-white/25 focus:outline-none text-base ${errors.name ? 'border-red-500' : 'border-white/15 focus:border-primary'}`}
-                  placeholder={he ? 'בר מצווה, Sweet 16...' : 'Bar Mitzvah, Sweet 16...'} />
-              </div>
-              <div>
-                <label className={`block text-xs mb-1 ${errors.date ? 'text-red-400' : 'text-white/50'}`}>{he ? 'תאריך' : 'Date'} *</label>
-                <input type="date" value={date} onChange={(e) => { setDate(e.target.value); setErrors((p) => ({ ...p, date: false })); }}
-                  className={`w-full px-4 py-3 rounded-xl bg-white/8 border text-white focus:outline-none text-base ${errors.date ? 'border-red-500' : 'border-white/15 focus:border-primary'}`} />
-              </div>
-              <div>
-                <label className="block text-xs text-white/50 mb-1">{he ? 'מקסימום הדפסות' : 'Max Prints'}</label>
-                <input type="number" value={maxPrints} onChange={(e) => setMaxPrints(parseInt(e.target.value) || 1)} min={1} max={50}
-                  className="w-full px-4 py-3 rounded-xl bg-white/8 border border-white/15 text-white focus:border-primary focus:outline-none text-base" />
-              </div>
-              {isSuperAdmin && (
-                <div>
-                  <label className="block text-xs text-white/50 mb-1">{he ? 'מנהל האירוע (בעל התיקייה בדרופבוקס)' : 'Event manager (Dropbox owner)'}</label>
-                  <select value={showNewUserForm ? NEW_USER_VALUE : ownerId}
-                    onChange={(e) => {
-                      if (e.target.value === NEW_USER_VALUE) { setShowNewUserForm(true); return; }
-                      setShowNewUserForm(false);
-                      setOwnerId(e.target.value);
-                    }}
-                    className="w-full px-4 py-3 rounded-xl bg-white/8 border border-white/15 text-white focus:border-primary focus:outline-none text-base">
-                    <option value="">{he ? '— אני —' : '— Myself —'}</option>
-                    {managers.map((m) => (
-                      <option key={m.id} value={m.id}>{m.name} ({m.email})</option>
-                    ))}
-                    <option value={NEW_USER_VALUE}>{he ? '+ צור משתמש חדש' : '+ Create new user'}</option>
-                  </select>
-                  <p className="text-[10px] text-white/25 mt-1">
-                    {he ? 'תמונות האירוע יעלו לדרופבוקס של המנהל שנבחר, אם חיבר אחד' : "Photos upload to the chosen manager's own Dropbox, if they've connected one"}
-                  </p>
-
-                  {showNewUserForm && (
-                    <div className="mt-3 p-4 rounded-xl bg-white/5 border border-white/10 space-y-2.5">
-                      <p className="text-xs font-bold text-white/70">{he ? 'משתמש חדש' : 'New user'}</p>
-                      <div>
-                        <input type="text" value={newUserName}
-                          onChange={(e) => { setNewUserName(e.target.value); setNewUserErrors((p) => ({ ...p, name: false })); }}
-                          placeholder={he ? 'שם מלא *' : 'Full name *'}
-                          className={`w-full px-3 py-2.5 rounded-lg bg-white/8 border text-white placeholder-white/25 focus:outline-none text-sm ${newUserErrors.name ? 'border-red-500' : 'border-white/15 focus:border-primary'}`} />
-                      </div>
-                      <div>
-                        <input type="email" value={newUserEmail}
-                          onChange={(e) => { setNewUserEmail(e.target.value); setNewUserErrors((p) => ({ ...p, email: false })); }}
-                          placeholder={he ? 'אימייל *' : 'Email *'} dir="ltr"
-                          className={`w-full px-3 py-2.5 rounded-lg bg-white/8 border text-white placeholder-white/25 focus:outline-none text-sm ${newUserErrors.email ? 'border-red-500' : 'border-white/15 focus:border-primary'}`} />
-                      </div>
-                      <div>
-                        <input type="tel" value={newUserPhone} onChange={(e) => setNewUserPhone(e.target.value)}
-                          placeholder={he ? 'טלפון (אופציונלי)' : 'Phone (optional)'} dir="ltr"
-                          className="w-full px-3 py-2.5 rounded-lg bg-white/8 border border-white/15 text-white placeholder-white/25 focus:border-primary focus:outline-none text-sm" />
-                      </div>
-                      <div>
-                        <input type="password" value={newUserPassword}
-                          onChange={(e) => { setNewUserPassword(e.target.value); setNewUserErrors((p) => ({ ...p, password: false })); }}
-                          placeholder={he ? 'סיסמה (10+ תווים) *' : 'Password (10+ chars) *'} dir="ltr" minLength={10}
-                          className={`w-full px-3 py-2.5 rounded-lg bg-white/8 border text-white placeholder-white/25 focus:outline-none text-sm ${newUserErrors.password ? 'border-red-500' : 'border-white/15 focus:border-primary'}`} />
-                      </div>
-                      <div className="flex gap-2 pt-1">
-                        <button type="button" className="btn-secondary flex-1 !py-2 !text-sm"
-                          onClick={() => { setShowNewUserForm(false); setOwnerId(''); }}>
-                          {he ? 'ביטול' : 'Cancel'}
-                        </button>
-                        <button type="button" className="btn-glow flex-1 !py-2 !text-sm" onClick={handleCreateUser}>
-                          {he ? 'צור והחל' : 'Create & use'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-              <div className="flex gap-3 pt-2">
-                <button className="btn-secondary flex-1" onClick={resetForm}>{he ? 'ביטול' : 'Cancel'}</button>
-                <button className="btn-glow flex-1" onClick={handleSave}>{he ? 'שמור' : 'Save'}</button>
-              </div>
-            </div>
-          </motion.div>
+          <EventFormPanel
+            isSuperAdmin={isSuperAdmin}
+            editingEvent={editingEvent}
+            managers={managers}
+            onUserCreated={(user) => setManagers((prev) => [...prev, user])}
+            onSaved={() => { setShowForm(false); setEditingEvent(null); loadEvents(); }}
+            onCancel={() => { setShowForm(false); setEditingEvent(null); }}
+          />
         )}
       </AnimatePresence>
 
@@ -479,7 +508,7 @@ function EventsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
                   {he ? '🖼️ גלריה' : '🖼️ Gallery'}
                 </button>
                 <button className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold bg-blue-500/15 text-blue-400 active:bg-blue-500/25"
-                  onClick={() => startEdit(event.id)}>{he ? 'ערוך' : 'Edit'}</button>
+                  onClick={() => startEdit(event)}>{he ? 'ערוך' : 'Edit'}</button>
                 <button className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold bg-white/8 text-white/60 active:bg-white/15"
                   onClick={() => handleToggle(event.id, event.active)}>{event.active ? '⏸' : '▶️'}</button>
                 <button className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold bg-red-500/15 text-red-400 active:bg-red-500/25"
@@ -1048,6 +1077,11 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
   const [errors, setErrors] = useState<{ name?: boolean; email?: boolean }>({});
   const loader = useLoader();
 
+  // "+ New Event" panel — the same form/owner-picker used on the Events tab,
+  // reachable here too so assigning (or creating) an event's owner doesn't
+  // require leaving the Users tab.
+  const [showEventForm, setShowEventForm] = useState(false);
+
   // Which user's row (events + actions) is expanded — only one open at a
   // time (tapping a row toggles it; tapping another row switches to that
   // one).
@@ -1203,6 +1237,23 @@ function UsersTab({ currentUserId }: { currentUserId?: string }) {
         {he ? 'ניהול משתמשים' : 'User Management'}
         <span className="text-xs text-white/30 font-normal ml-2">({users.length})</span>
       </h2>
+
+      <button className="btn-glow w-full mb-5" onClick={() => setShowEventForm(true)}>
+        + {he ? 'אירוע חדש' : 'New Event'}
+      </button>
+
+      <AnimatePresence>
+        {showEventForm && (
+          <EventFormPanel
+            isSuperAdmin
+            editingEvent={null}
+            managers={users.filter((u) => u.role === 'account_manager')}
+            onUserCreated={(user) => setUsers((prev) => [...prev, user])}
+            onSaved={() => { setShowEventForm(false); loadEvents(); loadUsers(); }}
+            onCancel={() => setShowEventForm(false)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Edit form — opened via the "Edit" action on a row below */}
       <AnimatePresence>
